@@ -1,17 +1,29 @@
-# iDrive8-RideTube (BETA)
+# iDrive8-RideTube
 
 RideTube, the unofficial YouTube client for BMW head units, **ported to iDrive 8 (MGU ID8)**. Based on
 [JustAnotherPU/ridetube](https://github.com/JustAnotherPU/ridetube) (iDrive 7), GPL-3.0-or-later; the port adds an
 iDrive 8 app (`jap_ridetube8`), an iDrive 8-capable service (`jap-ridetube-d` 0.5.2) and Node.js 22 marked for iDrive 8.
 
-> **Beta: runs on an iDrive 8 car, the sound not heard yet.** On a car the app draws, takes touch, searches and
-> shows thumbnails. That iDrive 8 does not offer the media player iDrive 7 plays OAP media with
-> (`OapGenericMedia`), so since service 0.5.0 the first play there **looks for a way to sound by itself**: first
-> the service's own player on the device of the car's audio router that the car then plays (seconds), then the
-> car's dynamic media player asked as BMW's own apps ask it (minutes). It may interrupt what is playing, the player
-> says what it is doing, and what plays is kept. If you see it playing and hear nothing: **No sound?** on the
-> player, twice. If nothing plays, **Settings > Diagnostics** has what the car answered: photograph its first
-> pages. Reports welcome in the issues.
+> **Sound and picture confirmed on an iDrive 8 car** (a G8x, Intel MGU21): app 0.4.6 with service 0.5.2, the
+> **stable** version. iDrive 8 does not offer the media player iDrive 7 plays OAP media with (`OapGenericMedia`);
+> the service plays through the car's dynamic media player instead, which it found by trying (see the changelog for
+> what the car takes). On another car the first play may take a moment to find its way; if you see it playing and
+> hear nothing, press **No sound?** on the player, twice. If nothing plays, **Settings > Diagnostics** has what the
+> car answered.
+
+## Stable and Beta 2
+
+| Channel | What it is | In the MGU Store: Add source |
+|---|---|---|
+| **Stable** | app 0.4.6, service 0.5.2: the version confirmed on a car, left as it is | `waliworld/iDrive8-RideTube`, **Releases** |
+| **Beta 2** | new work on top of it (this branch, `beta2`): picture size, the start screen, the new icon | the address `https://github.com/waliworld/iDrive8-RideTube/releases/download/beta2/catalog.json` |
+| Stable 1 | a copy of that stable version for keeping, never rebuilt | `https://github.com/waliworld/iDrive8-RideTube/releases/download/stable-1/catalog.json` |
+
+Beta 2 changes the **app** only (0.5.0); the service a Beta 2 car runs is the stable channel's own package. A long
+address is easiest added from the Store's phone page. **Back to stable:** remove the Beta 2 source in the Store,
+uninstall RideTube (the app; the service can stay), install it again from the stable source, restart the head unit.
+
+The port to iDrive 8 is by Waliworld (#tunedbywali); RideTube itself is JustAnotherPU's work.
 
 ## Install on an iDrive 8 car
 
@@ -34,6 +46,9 @@ MGU_STORE=<a clone of github.com/robertnisipeanu/mgu-store> tools/release_id8.sh
 ```
 
 Upload every file of `dist/release/` to the GitHub release tagged `catalog` (the Store reads its `catalog.json`).
+The Release workflow does this by itself: a push to `main` publishes the stable channel (`catalog`), a push to
+`beta2` the release `beta2` (`RELEASE_TAG=beta2`, then `tools/channel.py pin`: what did not change is the stable
+channel's own package).
 The script builds the app and packs the service and Node.js 22 from this repository; the prebuilt binaries (the video
 decoder `ytdec`, yt-dlp 2026.10.26 and the Node.js 22 build) are taken from JustAnotherPU's published releases and
 checked against sha256 sums pinned in the script.

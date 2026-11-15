@@ -64,6 +64,9 @@ const RAIL_W = 116;                                      // the icon rail, x 12.
 const X0 = 136, TW = 320, TH = 180, PITCH = 348;          // tiles: 16:9 thumbs, four a row, the fifth peeking
 const PER_ROW = Math.floor((W - X0 - TW) / PITCH) + 1;      // (4; iDrive 8's wider page: 5, the sixth peeking)
 const TILE_H = TH + 98, HEAD_H = 50, SHELF_GAP = 30, GRID_GAP = 22;   // a tile with its text; a shelf's title row
+const SPLASH_MS = process.env.MGU_RT_SPLASH_MS === undefined ? 1800 : Number(process.env.MGU_RT_SPLASH_MS);   // the start screen (env: tests)
+const ZOOMS = ['fit', 'z1', 'z2', 'fill'];               // app.json's Picture size values (iDrive 8), in the button's order
+const ZOOM_NAMES = { fit: 'Fit', z1: 'Zoom 1', z2: 'Zoom 2', fill: 'Fill' };
 const OVERLAY_MS = 4000;                                 // the player's controls hide this long after a tap (playing)
 const SEARCH_MS = 8000;                                  // a search with no answer by then is an error on screen
 const SUGGEST = ['Music', 'News', 'Cars', 'Podcasts', 'Comedy', 'Trailers'];
@@ -218,7 +221,7 @@ mgu.run({
             if (list) { const i = list.findIndex((r) => r.id === id); queue = list.slice(i + 1).filter((r) => r && !r.act && /^[\w-]{11}$/.test(r.id)); }
             nextAt = 0;
             if (model.id === id && model.active()) return;
-            model.play(id, rect(), settings.get('fill') !== false, it, { quality: settings.get('quality'), skip: sbSkip() });
+            model.play(id, rect(), ID8 ? false : settings.get('fill') !== false, it, { quality: settings.get('quality'), skip: sbSkip() });
         }
         // from render: ended with a next one -> 5 s to see what comes, then it plays (back to the list cancels)
         function autoNext() {
@@ -873,6 +876,15 @@ mgu.run({
             }
             if (model.state === 'error') cv.text(fit(cv, 'Error: ' + (model.error || 'playback stopped'), 28, bw, LIT), x0, SH - 54, 28, '#ff6b6b', LIT);
         }
+        // iDrive 8, the picture's size: the app area is 2880 x 764 and a 16:9 picture as tall as it leaves black on
+        // both sides. Zoomed, the same decoded frame is drawn larger around the centre and cut at the area's edges
+        // (the renderer's clip): Fit shows all of it, Fill is as wide as the screen (top and bottom cut), two steps
+        // between. Nothing is asked of the service or the decoder, so a step takes effect at once and the sound plays on.
+        const zoomKey = () => { const z = String(settings.get('zoom') || 'fit'); return ZOOMS.indexOf(z) >= 0 ? z : 'fit'; };
+        function zoomOf(pl) {
+            const full = Math.max(1, pl.w / (pl.h * 16 / 9));   // as wide as the area
+            return 1 + (full - 1) * ZOOMS.indexOf(zoomKey()) / (ZOOMS.length - 1);
+        }
         function drawFull(cv) {
             const pl = cv.place, s = pl.scale, SW = pl.w / s, SH = pl.h / s, dx = pl.ox / s, dy = pl.oy / s;
             cv.chrome = null;              // no header or bar composed over it (display.js present)
@@ -881,7 +893,11 @@ mgu.run({
             const tg = (x, y, w, h, run, key, r, turn) => cv.target(x - dx, y - dy, w, h, run, key, r, turn);
             cv.xf(1, 0, 0).fillRect(0, 0, pl.w, pl.h, '#000000');
             const pod = model.active() && noVideo();   // driving: podcast mode (no picture, big controls, always shown)
-            if (videoShown && !pod) cv.video(VID, 0, 0, pl.w, pl.h, 0);
+            if (videoShown && !pod) {
+                const z = ID8 ? zoomOf(pl) : 1;
+                if (z > 1.001) cv.clip(0, 0, pl.w, pl.h).video(VID, pl.w * (1 - z) / 2, pl.h * (1 - z) / 2, pl.w * z, pl.h * z, 0).noclip();
+                else cv.video(VID, 0, 0, pl.w, pl.h, 0);
+            }
             if (!overlay() && !pod) { cv.xf(); OVK.forEach((k) => tg(0, 0, SW, SH, wake, k, 0, k === 'ov:bar' ? turnSeek : undefined)); return; }
             cv.xf(s, 0, 0);
             const LX = HMI.left / s, act = model.active(), live = model.state === 'playing' || model.state === 'paused';
@@ -957,11 +973,22 @@ mgu.run({
                 ctl('ov:q', qx, cy, 42, () => { const q = QUALITIES[(QUALITIES.indexOf(qv) + 1) % QUALITIES.length]; settings.set('quality', q); model.quality(q); },
                     (c) => cv.text(qv === 'auto' ? 'Auto' : qv + 'p', qx, cy + 8, 22, c, { literal: true, font: 'bold', align: 'center' }));
                 cv.text('Quality', qx, cy + 76, 22, '#dddddd', { literal: true, align: 'center' });
-                ctl('ov:zoom', zx, cy, 42, () => { settings.set('fill', !fl); model.fill(!fl); }, (c) => {
-                    cv.strokeRoundRect(zx - 22, cy - 15, 44, 30, 4, 3, c);
-                    if (fl) cv.fillRect(zx - 22, cy - 15, 44, 30, c); else cv.fillRect(zx - 12, cy - 15, 24, 30, c);
-                });
-                cv.text(fl ? 'Unzoom' : 'Zoom', zx, cy + 76, 22, '#dddddd', { literal: true, align: 'center' });
+                if (ID8) {
+                    // iDrive 8: a press takes the next picture size (Fit, Zoom 1, Zoom 2, Fill, Fit...); the glyph
+                    // is the screen with the picture's width in it
+                    const zk = zoomKey(), zi = ZOOMS.indexOf(zk), half = 8 + zi * 14 / (ZOOMS.length - 1);
+                    ctl('ov:zoom', zx, cy, 42, () => { settings.set('zoom', ZOOMS[(zi + 1) % ZOOMS.length]); }, (c) => {
+                        cv.strokeRoundRect(zx - 24, cy - 12, 48, 24, 4, 3, c);
+                        cv.fillRect(zx - half, cy - 12, 2 * half, 24, c);
+                    });
+                    cv.text(ZOOM_NAMES[zk], zx, cy + 76, 22, '#dddddd', { literal: true, align: 'center' });
+                } else {
+                    ctl('ov:zoom', zx, cy, 42, () => { settings.set('fill', !fl); model.fill(!fl); }, (c) => {
+                        cv.strokeRoundRect(zx - 22, cy - 15, 44, 30, 4, 3, c);
+                        if (fl) cv.fillRect(zx - 22, cy - 15, 44, 30, c); else cv.fillRect(zx - 12, cy - 15, 24, 30, c);
+                    });
+                    cv.text(fl ? 'Unzoom' : 'Zoom', zx, cy + 76, 22, '#dddddd', { literal: true, align: 'center' });
+                }
                 // left, where the service plays through a way it found by trying (iDrive 8): "No sound?" - pressed
                 // twice, the service leaves that way out and goes on with the next
                 if (model.snd && model.snd.route) {
@@ -1020,9 +1047,37 @@ mgu.run({
             cv.polyline([[60, 384], [46, 398], [60, 412]], 5, '#ffffff');
             cv.xf();
         }
+        // the start screen: the first time the app is shown after its start, for SPLASH_MS (a tap ends it) - the
+        // mark of the icon (a rev counter around a play mark), the app's name, and who ported it to iDrive 8
+        let splashAt = 0, splashDone = !(SPLASH_MS > 0);
+        function drawSplash(cv, t) {
+            if (cv.own) cv.chrome = null;      // no header over it
+            const a = Math.max(0, Math.min(1, t / 250, (SPLASH_MS - t) / 250));
+            const cx = W / 2, cy = TOP + (H - TOP) / 2, mx = cx - 250, my = cy - 6;
+            cv.alpha(a);
+            // (angles: degrees clockwise from 12 o'clock - 270 degrees of dial, the last 53 red)
+            cv.arc(mx, my, 62, 72, -135, 68, '#e6ebf5', { round: true }).arc(mx, my, 62, 72, 82, 135, '#ff3b30', { round: true });
+            cv.circle(mx, my, 46, '#ff8a1f22');
+            tri(cv, mx, my, 62, '#ffa62b');
+            cv.text('RideTube', cx - 140, cy - 8, 76, '#ffffff', LITB);
+            cv.text('Waliworld', cx - 136, cy + 52, 34, C.amber, LITB);
+            cv.text('#tunedbywali', cx - 136 + cv.textWidth('Waliworld', 34, LITB) + 24, cy + 52, 34, '#e6ebf5', LIT);
+            cv.alpha(1);
+            cv.target(0, TOP, W, H - TOP, () => { splashDone = true; dirty = true; }, 'splash', 0);
+        }
         let last = null, lastRev = -1, lastT = 0, upNext = null;
         function render() {
             const now = Date.now();
+            if (!splashDone) {
+                if (!splashAt) splashAt = now;
+                if (now - splashAt < SPLASH_MS) {
+                    const sv = ctx.canvas(W, H).clear('#07080b');
+                    drawSplash(sv, now - splashAt);
+                    last = null;
+                    return ui.image('VIEW_GFX', sv);
+                }
+                splashDone = true; dirty = true;
+            }
             upNext = autoNext();
             // redraw on a change (and 4 times a second); unchanged, the same frame again keeps the layer alive (>= 1 message/s)
             if (!last || dirty || model.rev !== lastRev || now - lastT > 250) {

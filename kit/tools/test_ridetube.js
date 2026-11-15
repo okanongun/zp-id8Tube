@@ -8,6 +8,7 @@
 //   node kit/tools/test_ridetube.js
 
 const assert = require('assert');
+process.env.MGU_RT_SPLASH_MS = '0';      // (the start screen has its own check: test_ridetube8.js)
 const fs = require('fs');
 const net = require('net');
 const os = require('os');
@@ -381,7 +382,7 @@ async function appFrames() {
         disp.onTap(800, 300);
         await hu.loopFn();
         const hid = disp.pageTargets;
-        assert.ok(hid.length === 8 && hid.every((t) => t.w > 1000 && t.h > 500), 'a tap beside them: hidden, each key the whole screen');
+        assert.ok(hid.length === 9 && hid.every((t) => t.w > 1000 && t.h > 500), 'a tap beside them: hidden, each key the whole screen');
         assert.deepStrictEqual(frame().vrect, [0, 0, pl.w, pl.h], 'the video stays whole');
         const pauses = d.cmds('pause').length;
         hid.find((t) => t.key === 'ov:play').run();       // (as the controller pressed on its key, or a tap)

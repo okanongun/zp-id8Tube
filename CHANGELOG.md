@@ -1,5 +1,40 @@
 # Changelog
 
+## Beta 2 - App 0.5.0: picture size on iDrive 8, a start screen, a new icon
+
+The service is not changed (0.5.2, the stable channel's own package). Not confirmed on a car yet.
+
+- **Picture size (iDrive 8).** The app area is 2880 x 764: a 16:9 picture as tall as it leaves black on both sides.
+  The player's **Zoom** button now takes the next size - **Fit**, **Zoom 1**, **Zoom 2**, **Fill** (as wide as the
+  screen; top and bottom are cut) - and Settings has it as "Picture size". The same decoded frame is drawn larger
+  around the centre and cut at the area's edges by the renderer, so a step takes effect at once, the sound plays on,
+  and nothing is asked of the service or the decoder. The decoder is no longer asked to crop on iDrive 8 (a video
+  that is not 16:9 keeps its whole picture at Fit). The old "Fill the screen" setting is iDrive 7's.
+- **A start screen.** The first time the app is shown after its start: the mark, "RideTube", "Waliworld
+  #tunedbywali", for under two seconds; a tap ends it.
+- **A new icon**: a rev counter running into its red zone around a play mark.
+- **Channels** (`tools/channel.py`, the Release workflow): `main` publishes the stable channel (the release
+  `catalog`), `beta2` the release `beta2`; the first confirmed version is kept as the release `stable-1`.
+
+## Stable: app 0.4.6 and service 0.5.2 play sound and picture on an iDrive 8 car
+
+Confirmed on a G8x (14 photographed pages of Diagnostics, and the picture on its screen). What the car takes, for
+reference:
+
+- **The way that plays**: the car's dynamic media player, instance `DynamicMediaPlayerTempMedia`. The instance
+  `DynamicMediaPlayerMedia` played the same file without sound there (marked with "No sound?", left out since).
+- **The focus**: `getAudioFocus(jap_ridetube8, RideTube, 0)` - timer 0 - answers `OK` with a token; then
+  `HAS_FOCUS` and `CS_CONNECTED`.
+- **The item**: BMW's own form (`FILE_SIZE`, `ITEM_ID`, `FILE_NAME`), the file where the service keeps it (no copy
+  needed), and an id of four bytes: the type of the instance in the first byte (`EntertainmentTemp` is 3), the
+  low byte of the app's number in the second, a count in the last two (`03 B8 00 01`). With an all-zero id the car
+  answered `OK` and kept its list empty. (BMW's code makes that number of the last two characters of the app's
+  logging id; its types are Entertainment 0, Interrupt 1, Overlay 2, EntertainmentTemp 3, EntertainmentTempLum 4.)
+- **The start**: `setCurrentItemPositionAndTime(token, 1, 0)`; the list says 1/1 and the player `PLAYER_STATE_PLAY`
+  within a second. The time it reports is in milliseconds.
+- BMW's "sound property" after that is for video and overlays only (`setMainSinkSoundProperty` of the audio
+  manager's CommandControl, type 26): not needed for a file's sound.
+
 ## Service 0.5.2: iDrive 8, the car gives its audio focus and takes the playlist - its list stays empty
 
 The same G8x answered 0.5.1 (22 photographed pages). Nothing played yet, but the car's own player now talks to us.

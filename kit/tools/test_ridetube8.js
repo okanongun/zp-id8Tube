@@ -91,6 +91,17 @@ async function main() {
     const sheetTarget = (i) => disp.sheetTargets[i];
 
     assert.deepStrictEqual([pl.x, pl.y, pl.w, pl.h, pl.full], [0, 76, 2880, 764, true], 'the surface: the app area, under the status strip and over the climate bar');
+    // the start screen: the first frames after the start show the mark, the name and who ported it - nothing of the
+    // app to press yet; a tap (or its time) ends it
+    assert.deepStrictEqual(disp.pageTargets.map((t) => t.key), ['splash'], 'the start screen is all there is at first');
+    await sleep(320);
+    await hu.loopFn();
+    assert.deepStrictEqual(disp.pageTargets.map((t) => t.key), ['splash'], 'it stays for its time');
+    snap('start');
+    await tapTarget(target('splash'));
+    await hu.loopFn();
+    assert.ok(!target('splash') && target('rail:search'), 'a tap ends it: ' + disp.pageTargets.map((t) => t.key).join(' '));
+    console.log('ok   start screen: shown first, ended by a tap, then the app');
     assert.ok(disp.own(), 'the kit runs the screen');
     assert.ok(Math.abs(pl.scale * 2056 - 2880) < 2, 'the 2080 px page fills the width: scale ' + pl.scale);
     assert.ok(pl.scale > 1.39 && pl.scale < 1.42, 'about 1.4: ' + pl.scale);
@@ -169,6 +180,35 @@ async function main() {
     await hu.loopFn();
     assert.ok(target('ov:back') && target('ov:play'), 'the overlay: ' + disp.pageTargets.map((t) => t.key).join(' '));
     snap('player');
+    // the picture's size: the whole picture is decoded (no crop asked of the decoder); the Zoom button takes the
+    // next size - the same frame drawn larger around the centre and cut at the area's edges, nothing asked of the
+    // service. Fill is as wide as the screen. The setting keeps it.
+    assert.strictEqual(d.cmds('play')[0].fill, false, 'iDrive 8: the decoder is not asked to crop');
+    const videoOp = () => {
+        const w = disp.last.frame.words(), f = new Float32Array(w.buffer, w.byteOffset, w.length);
+        for (let i = 0; i + 6 < w.length; i++) if (w[i] === 19 && w[i + 6] === 1 && f[i + 3] >= 2880 && f[i + 4] >= 764) return { at: i, clip: w[i - 5] === 13 ? [f[i - 4], f[i - 3], f[i - 2], f[i - 1]] : null, box: [f[i + 1], f[i + 2], f[i + 3], f[i + 4]].map(Math.round) };
+        return null;
+    };
+    assert.deepStrictEqual(videoOp() && [videoOp().clip, videoOp().box], [null, [0, 0, 2880, 764]], 'Fit: the frame in the area, no clip');
+    const sentZ = d.got.length, shownW = [];
+    for (const want of ['z1', 'z2', 'fill']) {
+        await tapTarget(target('ov:zoom'));
+        await hu.loopFn();
+        assert.strictEqual(hu.ctx.settings.get('zoom'), want, 'the next size');
+        const v = videoOp();
+        assert.ok(v && v.clip, 'zoomed: drawn inside a clip');
+        assert.deepStrictEqual(v.clip, [0, 0, 2880, 764], 'cut at the area');
+        assert.ok(Math.abs(v.box[0] + v.box[2] / 2 - 1440) <= 1 && Math.abs(v.box[1] + v.box[3] / 2 - 382) <= 1, 'around the centre: ' + v.box);
+        shownW.push(Math.round(v.box[3] * 16 / 9));      // the 16:9 frame's width on the screen
+        snap('player-' + want);
+    }
+    assert.ok(shownW[0] > 1358 && shownW[0] < shownW[1] && shownW[1] < shownW[2] && Math.abs(shownW[2] - 2880) <= 2, 'wider each step, Fill as wide as the screen: ' + shownW);
+    await tapTarget(target('ov:zoom'));
+    await hu.loopFn();
+    assert.strictEqual(hu.ctx.settings.get('zoom'), 'fit', 'and round to Fit');
+    assert.deepStrictEqual(videoOp().box, [0, 0, 2880, 764]);
+    assert.deepStrictEqual(d.got.slice(sentZ).filter((m) => m.cmd === "fill" || m.cmd === "play"), [], 'nothing asked of the service for it');
+    console.log('ok   picture size: Fit, two zooms, Fill (' + shownW.join(', ') + ' px wide), drawn by the renderer - the sound plays on');
     drive(60);
     await sleep(400);
     await hu.loopFn();

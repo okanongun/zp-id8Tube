@@ -67,5 +67,8 @@ node tools/test_id8_collect.js >/dev/null
 
 node "$MGU_STORE/deploy/hu" artifact "$d" --out "$d/dist"
 node "$MGU_STORE/deploy/hu" artifact "$n" --out "$root/dist"
-python3 tools/release.py --hmi ID8 --tool "$root/dist/jap-node22@22.23.4.tgz"
-echo "release_id8.sh: upload every file of dist/release/ to the GitHub release tagged \"catalog\""
+# RELEASE_TAG: the GitHub release the car downloads the packages from (the channel; tools/channel.py). Default the
+# stable one, "catalog"
+tag=${RELEASE_TAG:-catalog}
+python3 tools/release.py --hmi ID8 --tool "$root/dist/jap-node22@22.23.4.tgz" --base "https://github.com/waliworld/iDrive8-RideTube/releases/download/$tag/"
+echo "release_id8.sh: upload every file of dist/release/ to the GitHub release tagged \"$tag\""
