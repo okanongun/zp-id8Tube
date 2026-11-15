@@ -1,5 +1,18 @@
 # Changelog
 
+## Beta 3 - App 0.6.0: BeeMTube2
+
+The main release. The service is not changed (0.5.2: the very package confirmed on a car). Beta 2's picture sizes
+and start screen are in it; neither they nor this version are confirmed on a car yet.
+
+- **The app is named BeeMTube2**: its tile, its header, its start screen, Settings and Diagnostics. The package ids,
+  the repository and the service's name in the Store ("RideTube service") stay, so an installed app updates in place.
+- **Credit where it is due**: the start screen and Settings say "based on RideTube by JustAnotherPU"; the licence
+  stays GPL-3.0-or-later.
+- **A new icon**: an original anime-style drawing of a grey turbo coupe, speed lines behind.
+- **Going back**: Beta 1 and Beta 2 are kept as the releases `stable-1` and `beta2` and the branches
+  `beta1-stable` and `beta2`. The main release takes the service and Node.js packages from `stable-1` unchanged.
+
 ## Beta 2 - App 0.5.0: picture size on iDrive 8, a start screen, a new icon
 
 The service is not changed (0.5.2, the stable channel's own package). Not confirmed on a car yet.
@@ -16,7 +29,7 @@ The service is not changed (0.5.2, the stable channel's own package). Not confir
 - **Channels** (`tools/channel.py`, the Release workflow): `main` publishes the stable channel (the release
   `catalog`), `beta2` the release `beta2`; the first confirmed version is kept as the release `stable-1`.
 
-## Stable: app 0.4.6 and service 0.5.2 play sound and picture on an iDrive 8 car
+## Beta 1 (stable): app 0.4.6 and service 0.5.2 play sound and picture on an iDrive 8 car
 
 Confirmed on a G8x (14 photographed pages of Diagnostics, and the picture on its screen). What the car takes, for
 reference:

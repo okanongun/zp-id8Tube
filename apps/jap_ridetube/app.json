@@ -1,6 +1,6 @@
 {
   "id": "jap_ridetube",
-  "title": "RideTube",
+  "title": "BeeMTube2",
   "description": "Video in the car: an unofficial client for YouTube. Your Home, Subscriptions and Watch later (signed in on the car), search, channels and chapters; the sound through the car's media player, the picture only while parked (a podcast view while driving). Needs the jap-ridetube-d tool.",
   "id8": {
     "id": "jap_ridetube8",
@@ -8,7 +8,7 @@
     "maxDiskUsage": 268435456,
     "description": "Video in the car, for iDrive 8: an unofficial client for YouTube. Your Home, Subscriptions and Watch later (signed in on the car), search with an on-screen keyboard, channels and chapters; the sound through the car's media player, the picture only while parked (a podcast view while driving). Touch only. Needs the jap-ridetube-d tool and the GPU renderer (mgu-render)."
   },
-  "version": "0.5.0",
+  "version": "0.6.0",
   "license": "GPL-3.0-or-later",
   "vendor": "custom",
   "loggingId": "OAA6",
@@ -25,7 +25,7 @@
     {
       "name": "VIEW",
       "kind": "canvas",
-      "title": "RideTube",
+      "title": "BeeMTube2",
       "hmi": false,
       "bg": "#0f0f0f",
       "buttons": [
@@ -54,7 +54,7 @@
     {
       "name": "MAIN",
       "kind": "menu",
-      "title": "RideTube search",
+      "title": "BeeMTube2 search",
       "settings": true,
       "items": [
         [

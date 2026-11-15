@@ -89,7 +89,7 @@ function shown(r, what, o) {
     assert.ok(r.frames >= 2, what + ': frames sent: ' + r.frames);
     assert.deepStrictEqual(r.fatal, [], what + ': nothing fatal');
 }
-const line1 = (tile, pageState, app) => new RegExp('^RideTube ' + version.replace(/\./g, '\\.') + ' for iDrive 8: running \\| start: [A-Z_]+ \\| tile: ' + tile + ' \\| page: ' + pageState + ' \\| app: ' + app);
+const line1 = (tile, pageState, app) => new RegExp('^BeeMTube2 ' + version.replace(/\./g, '\\.') + ' for iDrive 8: running \\| start: [A-Z_]+ \\| tile: ' + tile + ' \\| page: ' + pageState + ' \\| app: ' + app);
 
 // ---- the HMI's events in every form
 for (const s of ['id7-like', 'stack-strings', 'stack-objects', 'visible-first', 'no-getId', 'focus-shapes', 'stack-only']) {
@@ -143,7 +143,7 @@ for (const k of ['event', 'hang', 'late-rhmi', 'member', 'no-last', 'refuse-open
     assert.strictEqual(r.tile.enabled, 1, 'the tile ENABLED');
     assert.ok(line1('init mapped enabled', 'opened', 'failed \\| error: the app did not load: broken on purpose').test(r.info.VIEW_INFO1), 'line 1: ' + r.info.VIEW_INFO1);
     assert.ok(/^The app's own code did not load \(broken on purpose\)/.test(r.info.VIEW_INFO2), 'line 2: ' + r.info.VIEW_INFO2);
-    assert.ok(r.titles.some((t) => t === 'RideTube - did not load'), 'the title: ' + JSON.stringify(r.titles));
+    assert.ok(r.titles.some((t) => t === 'BeeMTube2 - did not load'), 'the title: ' + JSON.stringify(r.titles));
     console.log('ok   sdk kit-broken: the page opens without the app\'s code and says "' + r.info.VIEW_INFO2 + '"');
 }
 
@@ -152,7 +152,7 @@ for (const k of ['event', 'hang', 'late-rhmi', 'member', 'no-last', 'refuse-open
     const r = run('no-renderer');
     sane(r, 'no renderer');
     assert.deepStrictEqual(r.shows, [], 'no renderer: nothing shown');
-    assert.ok(r.titles.some((t) => /^RideTube - the GPU renderer \(mgu-render\) is not running/.test(t)), 'the title says why: ' + JSON.stringify(r.titles));
+    assert.ok(r.titles.some((t) => /^BeeMTube2 - the GPU renderer \(mgu-render\) is not running/.test(t)), 'the title says why: ' + JSON.stringify(r.titles));
     assert.ok(line1('init mapped enabled', 'opened', 'started').test(r.info.VIEW_INFO1), 'line 1: ' + r.info.VIEW_INFO1);
     assert.ok(/^Screen: the GPU renderer \(mgu-render\) is not running \| page: visible yes/.test(r.info.VIEW_INFO2), 'line 2: ' + r.info.VIEW_INFO2);
     assert.ok(/^Renderer: (no socket|not connected)/.test(r.info.VIEW_INFO3), 'line 3: ' + r.info.VIEW_INFO3);
@@ -163,7 +163,7 @@ for (const k of ['event', 'hang', 'late-rhmi', 'member', 'no-last', 'refuse-open
     // mgu-render/1 (MGU_RENDERD_PROTO=native): the renderer says it does not have the app in front
     const r = run('not-in-front', undefined, { MGU_RENDERD_PROTO: 'native' });
     sane(r, 'not in front');
-    assert.ok(r.titles.some((t) => /^RideTube - the GPU renderer does not see this app in front/.test(t)), 'the title says why: ' + JSON.stringify(r.titles));
+    assert.ok(r.titles.some((t) => /^BeeMTube2 - the GPU renderer does not see this app in front/.test(t)), 'the title says why: ' + JSON.stringify(r.titles));
     assert.ok(/mgu-render\/1, gate yes, touch yes .* in front no, on screen no/.test(r.info.VIEW_INFO3), 'line 3: ' + r.info.VIEW_INFO3);
     console.log('ok   mgu-render/1, not in front: "' + last(r.titles) + '"');
 }

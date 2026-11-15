@@ -310,7 +310,7 @@ async function main() {
     await until(() => d.cmds('diag').length === 1, 1000, 'the service asked for its diagnostics');
     disp._paintSheet();
     let rows = disp.sheet.laid.rows.map((r) => r.s);
-    assert.ok(/^RideTube app \d+\.\d+\.\d+ \(iDrive 8\) \| service: connected \| player: /.test(rows[0]), rows[0]);
+    assert.ok(/^BeeMTube2 app \d+\.\d+\.\d+ \(iDrive 8\) \| service: connected \| player: /.test(rows[0]), rows[0]);
     assert.ok(/^Screen: renderer connected.*2880x960, IterioDev dialect \| car: standing \(speed 0 km\/h\)$/.test(rows[1]), rows[1]);
     assert.strictEqual(rows[2], 'Asking the RideTube service...');
     const long = 'NOT READY - no org_genivi_am_commandinterface_CommandControl.json in /usr/lib/oap-mainapp/src-gen, /usr/lib/oap-mainapp/src-gen/someip, /usr/lib/oap-mainapp21/src-gen/someip, /usr/lib/oap-mainapp21/src-gen | stopped at: finding the CommandControl description | try 12';

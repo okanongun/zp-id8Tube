@@ -1,29 +1,32 @@
-# iDrive8-RideTube
+# BeeMTube2 (iDrive8-RideTube)
 
-RideTube, the unofficial YouTube client for BMW head units, **ported to iDrive 8 (MGU ID8)**. Based on
-[JustAnotherPU/ridetube](https://github.com/JustAnotherPU/ridetube) (iDrive 7), GPL-3.0-or-later; the port adds an
-iDrive 8 app (`jap_ridetube8`), an iDrive 8-capable service (`jap-ridetube-d` 0.5.2) and Node.js 22 marked for iDrive 8.
+**BeeMTube2** is an unofficial YouTube client for BMW **iDrive 8** head units (MGU ID8), installed from the MGU Store.
 
-> **Sound and picture confirmed on an iDrive 8 car** (a G8x, Intel MGU21): app 0.4.6 with service 0.5.2, the
-> **stable** version. iDrive 8 does not offer the media player iDrive 7 plays OAP media with (`OapGenericMedia`);
-> the service plays through the car's dynamic media player instead, which it found by trying (see the changelog for
-> what the car takes). On another car the first play may take a moment to find its way; if you see it playing and
-> hear nothing, press **No sound?** on the player, twice. If nothing plays, **Settings > Diagnostics** has what the
-> car answered.
+It began as a port of [RideTube by JustAnotherPU](https://github.com/JustAnotherPU/ridetube) (iDrive 7) and is based on
+that work: the app, its service and the way they are built are JustAnotherPU's, GPL-3.0-or-later, and this project
+stays under the same licence. The iDrive 8 version - how it finds the car's sound, its picture sizes, its screens -
+has grown far enough from the original to carry its own name. It is by Waliworld (#tunedbywali). The repository,
+the package ids (`jap_ridetube8`, `jap-ridetube-d`) and the service's name in the Store ("RideTube service") keep
+their names, so a car that has an earlier version updates in place.
 
-## Stable and Beta 2
+> **Sound and picture are confirmed on an iDrive 8 car** (a G8x, Intel MGU21) with Beta 1. iDrive 8 does not offer
+> the media player iDrive 7 plays OAP media with; the service plays through the car's dynamic media player instead,
+> which it found by trying (the changelog has what the car takes). On another car the first play may take a moment
+> to find its way; if you see it playing and hear nothing, press **No sound?** on the player, twice. If nothing
+> plays, **Settings > Diagnostics** has what the car answered.
 
-| Channel | What it is | In the MGU Store: Add source |
-|---|---|---|
-| **Stable** | app 0.4.6, service 0.5.2: the version confirmed on a car, left as it is | `waliworld/iDrive8-RideTube`, **Releases** |
-| **Beta 2** | new work on top of it (this branch, `beta2`): picture size, the start screen, the new icon | the address `https://github.com/waliworld/iDrive8-RideTube/releases/download/beta2/catalog.json` |
-| Stable 1 | a copy of that stable version for keeping, never rebuilt | `https://github.com/waliworld/iDrive8-RideTube/releases/download/stable-1/catalog.json` |
+## Versions, and going back
 
-Beta 2 changes the **app** only (0.5.0); the service a Beta 2 car runs is the stable channel's own package. A long
-address is easiest added from the Store's phone page. **Back to stable:** remove the Beta 2 source in the Store,
-uninstall RideTube (the app; the service can stay), install it again from the stable source, restart the head unit.
+| Version | What it is | In the MGU Store: Add source | Branch |
+|---|---|---|---|
+| **Beta 3** (the main release) | BeeMTube2: app 0.6.0 - the new name and icon, picture size (zoom), the start screen. Service 0.5.2, unchanged | `waliworld/iDrive8-RideTube`, **Releases** | `main` |
+| Beta 2 | app 0.5.0 (still named RideTube): picture size, the start screen. Service 0.5.2 | the address `https://github.com/waliworld/iDrive8-RideTube/releases/download/beta2/catalog.json` | `beta2` |
+| Beta 1 (stable) | app 0.4.6, service 0.5.2: the first version confirmed on a car | the address `https://github.com/waliworld/iDrive8-RideTube/releases/download/stable-1/catalog.json` | `beta1-stable` |
 
-The port to iDrive 8 is by Waliworld (#tunedbywali); RideTube itself is JustAnotherPU's work.
+All three run the **same service package** (0.5.2, the one confirmed on a car); only the app differs. **To go
+back** on a car: add the older version's address as a source (easiest from the Store's phone page), uninstall the
+app (the service can stay), install it again from that source, restart the head unit. The releases `stable-1` and
+`beta2` and the branches `beta1-stable` and `beta2` are kept as they are for that.
 
 ## Install on an iDrive 8 car
 
@@ -31,13 +34,13 @@ The port to iDrive 8 is by Waliworld (#tunedbywali); RideTube itself is JustAnot
    Back up the head unit's coding before rooting it.
 2. The car online through the Store's uplink (`mgu-uplink`: phone hotspot, USB LTE stick or Wi-Fi).
 3. In the Store: Settings, **Add source**, type `waliworld/iDrive8-RideTube` and pick **Releases**.
-4. Install **RideTube**. The Store installs with it, from this source, its service `jap-ridetube-d` and Node.js 22
+4. Install **BeeMTube2**. The Store installs with it, from this source, its service `jap-ridetube-d` and Node.js 22
    (`jap-node22`); from its own source the renderer `mgu-render`, `mgu-python` and the deploy tool.
 5. **Restart the head unit**: on iDrive 8 an app installs at the next start.
-6. Open RideTube from All apps. Home shows a code: enter it at google.com/device on your phone to sign in
+6. Open BeeMTube2 from All apps. Home shows a code: enter it at google.com/device on your phone to sign in
    (or search without signing in).
 
-Uninstall: in RideTube's Settings (left rail), Sign out; then uninstall RideTube and its service in the Store.
+Uninstall: in BeeMTube2's Settings (left rail), Sign out; then uninstall BeeMTube2 and its service ("RideTube service") in the Store.
 
 ## Releasing (maintainers)
 
@@ -46,9 +49,9 @@ MGU_STORE=<a clone of github.com/robertnisipeanu/mgu-store> tools/release_id8.sh
 ```
 
 Upload every file of `dist/release/` to the GitHub release tagged `catalog` (the Store reads its `catalog.json`).
-The Release workflow does this by itself: a push to `main` publishes the stable channel (`catalog`), a push to
-`beta2` the release `beta2` (`RELEASE_TAG=beta2`, then `tools/channel.py pin`: what did not change is the stable
-channel's own package).
+The Release workflow does this by itself on a push to `main`: it builds, takes every component whose version
+did not change from the kept release `stable-1` as it is (`tools/channel.py pin`: the service a car runs stays the
+very package that was confirmed), and publishes the rest with the new `catalog.json`.
 The script builds the app and packs the service and Node.js 22 from this repository; the prebuilt binaries (the video
 decoder `ytdec`, yt-dlp 2026.10.26 and the Node.js 22 build) are taken from JustAnotherPU's published releases and
 checked against sha256 sums pinned in the script.

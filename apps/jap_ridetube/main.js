@@ -246,10 +246,10 @@ mgu.run({
         function openMenu() {
             const signedIn = () => model.auth.state === 'signed_in';
             ctx.sheet(cardSheet({
-                title: 'Settings', heading: 'RideTube',
+                title: 'Settings', heading: 'BeeMTube2',
                 subtitle: () => (!model.connected ? 'The RideTube service (jap-ridetube-d) is not running' : signedIn() ? 'Signed in on the car' : 'Not signed in'),
                 rows: () => [['Account', signedIn() ? 'Signed in' : 'Signed out'], ['Now playing', model.active() ? model.title || model.id : 'Nothing'],
-                    ['Version', mgu.SPEC.version]],
+                    ['Version', mgu.SPEC.version], ['iDrive 8 version by', 'Waliworld #tunedbywali'], ['Based on', 'RideTube by JustAnotherPU (GPL-3.0-or-later)']],
                 note: 'Unofficial client for YouTube · Skip data: SponsorBlock (sponsor.ajay.app), CC BY-NC-SA 4.0',
                 actions: () => [
                     signedIn()
@@ -272,7 +272,7 @@ mgu.run({
             const g = ctx.display && ctx.display.gpu, dg = model.diag;
             const key = [model.connected, dg && dg.t, model.state, model.error, parked.moving(), parked.speed() === null, g && g.ready].join('|');
             if (diagMemo && diagMemo.key === key) return diagMemo.lines;
-            const lines = ['RideTube app ' + mgu.SPEC.version + (mgu.SPEC.hmi ? ' (' + (mgu.SPEC.hmi === 'ID8' ? 'iDrive 8' : mgu.SPEC.hmi) + ')' : '') +
+            const lines = ['BeeMTube2 app ' + mgu.SPEC.version + (mgu.SPEC.hmi ? ' (' + (mgu.SPEC.hmi === 'ID8' ? 'iDrive 8' : mgu.SPEC.hmi) + ')' : '') +
                 ' | service: ' + (model.connected ? 'connected' : 'NOT RUNNING') + ' | player: ' + model.state + (model.error ? ' | last error: ' + model.error : '')];
             lines.push('Screen: ' + (!g ? 'no GPU renderer' : (g.ready ? 'renderer connected' : 'renderer not connected') + (g.path ? ' ' + g.path : '') +
                 (g.screen ? ', ' + g.screen.w + 'x' + g.screen.h : '') + (g.native ? ', mgu-render/1' : g.iterio ? ', IterioDev dialect' : '')) +
@@ -286,7 +286,7 @@ mgu.run({
         function openDiag() {
             model.diag = null;
             model.askDiag();
-            ctx.sheet(textSheet({ title: 'Diagnostics', heading: 'RideTube diagnostics', lines: diagLines,
+            ctx.sheet(textSheet({ title: 'Diagnostics', heading: 'BeeMTube2 diagnostics', lines: diagLines,
                 actions: [{ label: 'Refresh', run: () => { model.diag = null; model.askDiag(); return null; } }] }));
         }
         ui.onClick('BTN_PLAY', () => model.toggle());
@@ -801,7 +801,7 @@ mgu.run({
         function drawPodcast(cv, SW, SH, LX, tg, run, live) {
             cv.fillRect(0, 0, SW, SH, C.bg);
             const x0 = LX + 46, top = 40, ch = model.channel || (model.item(model.id) || {}).channel;
-            cv.text('RideTube', x0, top + 30, 34, '#ffffff', LITB);
+            cv.text('BeeMTube2', x0, top + 30, 34, '#ffffff', LITB);
             const chip = 'Podcast mode · driving', cw = cv.textWidth(chip, 22, LIT) + 40;
             cv.roundRect(x0 + 170, top, cw, 40, 20, C.ph);
             cv.text(chip, x0 + 170 + cw / 2, top + 28, 22, C.dim, { literal: true, align: 'center' });
@@ -1048,7 +1048,7 @@ mgu.run({
             cv.xf();
         }
         // the start screen: the first time the app is shown after its start, for SPLASH_MS (a tap ends it) - the
-        // mark of the icon (a rev counter around a play mark), the app's name, and who ported it to iDrive 8
+        // mark (a rev counter around a play mark), the app's name, who made the iDrive 8 version, and whose work it is based on
         let splashAt = 0, splashDone = !(SPLASH_MS > 0);
         function drawSplash(cv, t) {
             if (cv.own) cv.chrome = null;      // no header over it
@@ -1059,9 +1059,10 @@ mgu.run({
             cv.arc(mx, my, 62, 72, -135, 68, '#e6ebf5', { round: true }).arc(mx, my, 62, 72, 82, 135, '#ff3b30', { round: true });
             cv.circle(mx, my, 46, '#ff8a1f22');
             tri(cv, mx, my, 62, '#ffa62b');
-            cv.text('RideTube', cx - 140, cy - 8, 76, '#ffffff', LITB);
-            cv.text('Waliworld', cx - 136, cy + 52, 34, C.amber, LITB);
-            cv.text('#tunedbywali', cx - 136 + cv.textWidth('Waliworld', 34, LITB) + 24, cy + 52, 34, '#e6ebf5', LIT);
+            cv.text('BeeMTube2', cx - 140, cy - 18, 76, '#ffffff', LITB);
+            cv.text('Waliworld', cx - 136, cy + 40, 34, C.amber, LITB);
+            cv.text('#tunedbywali', cx - 136 + cv.textWidth('Waliworld', 34, LITB) + 24, cy + 40, 34, '#e6ebf5', LIT);
+            cv.text('based on RideTube by JustAnotherPU', cx - 136, cy + 84, 22, '#8f98a8', LIT);
             cv.alpha(1);
             cv.target(0, TOP, W, H - TOP, () => { splashDone = true; dirty = true; }, 'splash', 0);
         }

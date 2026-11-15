@@ -1,16 +1,15 @@
-# The release channels of this repository's MGU Store catalog (tools/channel.py):
-#   main   -> the GitHub release tagged "catalog": the stable channel, what the Store reads for
-#             waliworld/iDrive8-RideTube (Releases)
-#   beta2  -> the release tagged "beta2": new work, added on a car by the address of its catalog.json; what did not
-#             change since stable is the stable channel's own package
-# A run on beta2 also keeps the first version confirmed with sound and picture on a car as the release "stable-1"
-# (a copy of the stable catalog and its packages at that moment, made once and never rebuilt).
-# Runs when one of the two branches changes in what goes into the release, or by hand (Actions, Run workflow).
+# Publishes this repository's MGU Store catalog (the GitHub release tagged "catalog": what the Store reads for
+# waliworld/iDrive8-RideTube, Releases) from main. Every component whose version did not change since the kept
+# release "stable-1" (the first version confirmed on a car) is taken from there as it is (tools/channel.py pin),
+# so the service a car runs stays the very package that was confirmed until its version changes.
+# Kept for going back, and never rebuilt by this workflow: the releases "stable-1" (Beta 1) and "beta2" (Beta 2),
+# the branches beta1-stable and beta2.
+# Runs when main changes in what goes into the release, or by hand (Actions, Run workflow).
 name: Release (MGU Store catalog)
 
 on:
   push:
-    branches: [main, beta2]
+    branches: [main]
     paths:
       - 'apps/**'
       - 'kit/**'
@@ -24,13 +23,11 @@ permissions:
   contents: write
 
 concurrency:
-  group: catalog-release-${{ github.ref_name }}
+  group: catalog-release
   cancel-in-progress: false
 
 env:
-  STABLE_CATALOG: https://github.com/waliworld/iDrive8-RideTube/releases/download/catalog/catalog.json
-  # the commit of main the stable channel was confirmed at (app 0.4.6, service 0.5.2)
-  STABLE_1_COMMIT: cb89fd43365c27ce31e7d9fa3fdb591a21abb3a7
+  KEPT_CATALOG: https://github.com/waliworld/iDrive8-RideTube/releases/download/stable-1/catalog.json
 
 jobs:
   release:
@@ -42,28 +39,6 @@ jobs:
         with:
           node-version: '22'
 
-      - name: The channel of this branch
-        run: |
-          case "$GITHUB_REF_NAME" in
-            main) echo "RELEASE_TAG=catalog" >> "$GITHUB_ENV" ;;
-            beta2) echo "RELEASE_TAG=beta2" >> "$GITHUB_ENV" ;;
-            *) echo "no release channel for the branch $GITHUB_REF_NAME" >&2; exit 1 ;;
-          esac
-
-      - name: Keep the confirmed stable version as the release "stable-1" (once)
-        if: github.ref_name == 'beta2'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if gh release view stable-1 >/dev/null 2>&1; then echo "stable-1 is kept already"; exit 0; fi
-          python3 tools/channel.py freeze "$STABLE_CATALOG" stable-1 "$RUNNER_TEMP/stable-1" \
-            --expect jap_ridetube8=0.4.6 --expect jap-ridetube-d=0.5.2
-          gh release create stable-1 --target "$STABLE_1_COMMIT" \
-            --title "RideTube for iDrive 8 - Stable 1 (sound and picture confirmed)" \
-            --notes "The first version confirmed with sound and picture on an iDrive 8 car (G8x): app 0.4.6, service 0.5.2. A copy for keeping, never rebuilt. To go back to exactly this version, add the address of this release's catalog.json as a source in the MGU Store."
-          gh release upload stable-1 "$RUNNER_TEMP"/stable-1/*
-          echo "kept:"; ls -l "$RUNNER_TEMP/stable-1"
-
       - name: Test tools (ffmpeg and jpegtran make the tests' media; gcc with the static libc builds ytaud)
         run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg libjpeg-turbo-progs file gcc libc6-dev git
 
@@ -71,26 +46,21 @@ jobs:
         run: git clone --depth 1 https://github.com/robertnisipeanu/mgu-store "$RUNNER_TEMP/mgu-store"
 
       - name: Build the release (dist/release/)
-        run: MGU_STORE="$RUNNER_TEMP/mgu-store" tools/release_id8.sh
+        run: MGU_STORE="$RUNNER_TEMP/mgu-store" RELEASE_TAG=catalog tools/release_id8.sh
 
-      - name: "Beta: what did not change is the stable channel's own package"
-        if: github.ref_name == 'beta2'
-        run: python3 tools/channel.py pin dist/release "$STABLE_CATALOG"
+      - name: What did not change since stable-1 is its own package
+        run: python3 tools/channel.py pin dist/release "$KEPT_CATALOG"
 
-      - name: Publish it as the release of the channel
+      - name: Publish it as the release "catalog"
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            if [ "$RELEASE_TAG" = catalog ]; then
-              gh release create catalog --target "$GITHUB_SHA" \
-                --title "MGU Store catalog (RideTube for iDrive 8, stable)" \
-                --notes "The MGU Store reads catalog.json here. In the Store: Settings, Add source, \`waliworld/iDrive8-RideTube\`, Releases. Then install RideTube and restart the head unit. Rebuilt by the Release workflow on every change to main."
-            else
-              gh release create "$RELEASE_TAG" --target "$GITHUB_SHA" --prerelease \
-                --title "RideTube for iDrive 8 - Beta 2 (new work; stable stays in the catalog release)" \
-                --notes "New work on top of the stable version. In the MGU Store: Settings, Add source, the address of this release's catalog.json. Rebuilt by the Release workflow on every change to the branch beta2. To go back: remove this source, uninstall RideTube, install it again from waliworld/iDrive8-RideTube."
-            fi
+          title="BeeMTube2 for iDrive 8 - Beta 3 (MGU Store catalog, the main release)"
+          notes="The MGU Store reads catalog.json here. In the Store: Settings, Add source, \`waliworld/iDrive8-RideTube\`, Releases. Then install BeeMTube2 and restart the head unit. Rebuilt by the Release workflow on every change to main. Older versions of the packages stay attached below. To go back: Beta 2 is the release \`beta2\`, Beta 1 (stable) the release \`stable-1\` - add the address of its catalog.json as a source, uninstall the app, install it again from there. Based on RideTube by JustAnotherPU."
+          if gh release view catalog >/dev/null 2>&1; then
+            gh release edit catalog --title "$title" --notes "$notes" --latest
+          else
+            gh release create catalog --target "$GITHUB_SHA" --title "$title" --notes "$notes" --latest
           fi
-          gh release upload "$RELEASE_TAG" dist/release/* --clobber
+          gh release upload catalog dist/release/* --clobber
           echo "published:"; ls -l dist/release

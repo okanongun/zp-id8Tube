@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""The release channels of this repository's MGU Store catalog.
+"""The kept versions of this repository's MGU Store catalog.
 
-  stable   the GitHub release tagged `catalog` (what the Store reads for waliworld/iDrive8-RideTube, Releases): built
-           from main. Its first confirmed state is also kept, never rebuilt, as the release `stable-1`.
-  beta2    the release tagged `beta2`, built from the branch beta2; added on a car by the address of its catalog.json.
+  catalog    the GitHub release the Store reads for waliworld/iDrive8-RideTube (Releases): built from main.
+  stable-1   Beta 1, the first version confirmed with sound and picture on a car: a copy, never rebuilt.
+  beta2      Beta 2 (the branch beta2), not rebuilt either.
 
-pin     python3 tools/channel.py pin <dist/release> <stable catalog.json: a file or an https address>
-        Every component of the built catalog that the stable catalog has at the same version is taken from there as
-        it is (its entry, with the stable release's address, size and hash), and its package is removed from the
-        folder: a car that follows the beta channel keeps the very packages of the stable one for what did not change.
+pin     python3 tools/channel.py pin <dist/release> <a kept catalog.json: a file or an https address>
+        Every component of the built catalog that the kept catalog has at the same version is taken from there as
+        it is (its entry, with the kept release's address, size and hash), and its package is removed from the
+        folder: a car keeps the very packages that were confirmed for what did not change.
 freeze  python3 tools/channel.py freeze <catalog.json address> <tag> <out folder> [--expect id=version ...]
         A copy of a published catalog for keeping: every package and icon it names is downloaded and checked against
         its size and sha256, and the catalog is written with their addresses in the release <tag> of the same
@@ -60,7 +60,7 @@ def pin(out, stable_src):
     for i, c in enumerate(cat['components']):
         s = by_id.get(c['id'])
         if not s or s.get('version') != c.get('version'):
-            said.append('%s %s: this channel\'s own' % (c['id'], c.get('version')))
+            said.append('%s %s: built now' % (c['id'], c.get('version')))
             continue
         name = c['artifact']['name']
         # (an app's icon belongs to its entry: the stable one's goes with the stable entry, by its whole address -
@@ -73,7 +73,7 @@ def pin(out, stable_src):
                 os.unlink(os.path.join(out, f))
             except OSError:
                 pass
-        said.append('%s %s: the stable channel\'s package (%s)' % (c['id'], c['version'], s['artifact']['url']))
+        said.append('%s %s: the kept package (%s)' % (c['id'], c['version'], s['artifact']['url']))
     with open(path, 'w') as f:
         json.dump(cat, f, indent=2)
         f.write('\n')
