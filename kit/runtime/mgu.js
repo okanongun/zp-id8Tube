@@ -715,8 +715,10 @@ async function runInner(impl) {
          * the list with the bar in the colour of the selection (no frame round the page).
          */
         onScroll(fn) { display.onScroll = fn; },
-        /** onSwipe(fn): fn(dx) on a finger dragged sideways over the page where the kit runs the screen (+ = the finger went left, logical px); true when the page moved. A drag is no tap. */
+        /** onSwipe(fn): fn(dx, x0, y0) on a finger dragged sideways over the page where the kit runs the screen (+ = the finger went left, logical px; x0, y0: where it was put down); true when the page moved. A drag is no tap, and keeps to the way it began: sideways or up and down. */
         onSwipe(fn) { display.onSwipe = fn; },
+        /** onFinger(fn): fn('down') when a finger is put on the page, fn('up', axis) when it is lifted - axis 'x' or 'y' after a drag sideways or up and down (the page may glide on from there), null after a tap. Where the kit runs the screen. */
+        onFinger(fn) { display.onFinger = fn; },
         /**
          * onLayout(fn): fn() when where the frame goes changed (the renderer came or went, touch routing, the
          * layout setting): an app that draws only when its data changes draws again then.

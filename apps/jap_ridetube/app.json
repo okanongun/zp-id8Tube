@@ -8,7 +8,7 @@
     "maxDiskUsage": 268435456,
     "description": "Video in the car, for iDrive 8: an unofficial client for YouTube. Your Home, Subscriptions and Watch later (signed in on the car), search with an on-screen keyboard, channels and chapters; the sound through the car's media player, the picture only while parked (a podcast view while driving). Touch only. Needs the jap-ridetube-d tool and the GPU renderer (mgu-render)."
   },
-  "version": "0.6.0",
+  "version": "0.7.0",
   "license": "GPL-3.0-or-later",
   "vendor": "custom",
   "loggingId": "OAA6",
@@ -168,6 +168,30 @@
       ]
     },
     {
+      "key": "dim",
+      "label": "Picture brightness (a bright video at night)",
+      "type": "choice",
+      "default": "100",
+      "options": [
+        [
+          "100",
+          "100 %"
+        ],
+        [
+          "85",
+          "85 %"
+        ],
+        [
+          "70",
+          "70 %"
+        ],
+        [
+          "55",
+          "55 %"
+        ]
+      ]
+    },
+    {
       "key": "quality",
       "label": "Video quality",
       "type": "choice",
@@ -188,6 +212,26 @@
         [
           "360",
           "360p (least data)"
+        ]
+      ]
+    },
+    {
+      "key": "after",
+      "label": "When a video ends",
+      "type": "choice",
+      "default": "next",
+      "options": [
+        [
+          "next",
+          "Play the next of its row"
+        ],
+        [
+          "repeat",
+          "Play it again"
+        ],
+        [
+          "stop",
+          "Stop"
         ]
       ]
     },

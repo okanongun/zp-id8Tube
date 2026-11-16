@@ -1,5 +1,37 @@
 # Changelog
 
+## Beta 4 - App 0.7.0: a smoother app, more in the player
+
+The main release. The service is not changed (0.5.2: the very package confirmed on a car). Not confirmed on a car
+yet; Beta 3 is kept as the release `beta3` and the branch `beta3`.
+
+Smoother (iDrive 8, where the app draws its own screen):
+
+- **Pages run on.** A page follows a finger at once and, let go while moving, runs on and slows down; it stops at
+  its ends and under a finger (that tap picks nothing).
+- **Shelves follow a finger.** Dragged sideways, a shelf's tiles move with the finger and settle on a tile - further
+  on when let go while moving. A drag keeps to the way it began: sideways turns the shelf, up and down moves the
+  page. The arrows glide a shelf five tiles on.
+- **Glides instead of jumps** where the page is moved to a place (the controller), and the player's controls come
+  in over a moment.
+
+More in the player (iDrive 8):
+
+- **Double tap to seek**: two quick taps on the right third of the picture go 10 s on, on the left third 10 s back;
+  each further tap 10 s more. A badge says how far; the controls stay away.
+- **Previous and Next** beside the 10 s buttons: Next plays the next video of the row the video was picked from;
+  Previous goes to the video's start or, in its first 5 s, to the video played before it.
+- **When a video ends** (Settings): play the next of its row (as before), play it again, or stop.
+- **Picture brightness** (Settings): 100, 85, 70 or 55 % - a veil over a bright video at night, at once.
+
+And:
+
+- **The start screen shows the app's logo** (the icon's own picture; a drawn mark only where the renderer draws no
+  pictures).
+- **The icon is redrawn** in a realistic style: an original grey sports coupe, front on, under studio light.
+- The kit: a drag is locked to the way it began; `ctx.onSwipe(fn(dx, x0, y0))` says where the finger was put down;
+  `ctx.onFinger(fn(phase, axis))` says when a finger is put down and lifted.
+
 ## Beta 3 - App 0.6.0: BeeMTube2
 
 The main release. The service is not changed (0.5.2: the very package confirmed on a car). Beta 2's picture sizes

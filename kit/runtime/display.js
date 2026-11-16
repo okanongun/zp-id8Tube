@@ -539,7 +539,9 @@ class Display {
             const tab = !bar && (this.tabs || []).find(inside);
             const tgt = !bar && !tab && !this.sheet ? (this.pageTargets || []).find(inside) : null;
             const key = bar ? 'bar:' + bar.id : tab ? 'tab:' + tab.i : tgt ? 'tgt:' + tgt.key : this.sheet ? 'sheet:' + (this.sheetTargets || []).findIndex(inside) : null;
-            if (phase === 3 && this.dragging && !this.sheet) { this.dragging = false; this.ownDown = null; return; }
+            // the finger is off the page: after a drag the page may go on by itself from here (ctx.onFinger)
+            if (phase === 3 && this.onFinger && !this.sheet) { try { this.onFinger('up', this.dragging ? this.dragAxis : null); } catch (e) { this.log.error('finger', e); } }
+            if (phase === 3 && this.dragging && !this.sheet) { this.dragging = false; this.ownDown = null; this.dragAxis = null; return; }
             if (phase === 3 && !this.dragging && key && key === this.ownDown && (tab || tgt)) {
                 this.ownDown = null;
                 if (tab) this._openTab(tab.i);
@@ -551,19 +553,23 @@ class Display {
                 return;
             }
             // a finger moved on a sheet: its list follows (no tap then)
-            if (phase === 1) { this.ownDown = key; this.downAt = { x, y }; this.lastX = x; this.lastY = y; this.dragging = false; } else if (phase === 2) {
-                if (!this.sheet && this.onSwipe && !bar && !tab && this.downAt) {
-                    if (!this.dragging && Math.abs(x - this.downAt.x) > 14) this.dragging = true;
-                    if (this.dragging) {
-                        let moved = false;
-                        try { moved = !!this.onSwipe(this.lastX - x); } catch (e) { this.log.error('swipe', e); }
-                        if (moved) this.tickHandlers.forEach((fn) => fn());
-                    }
+            if (phase === 1) {
+                this.ownDown = key; this.downAt = { x, y }; this.lastX = x; this.lastY = y; this.dragging = false; this.dragAxis = null;
+                if (this.onFinger && !this.sheet) { try { this.onFinger('down'); } catch (e) { this.log.error('finger', e); } }
+            } else if (phase === 2) {
+                // a drag keeps to the way it began: sideways (onSwipe) or up and down (the page scrolls), not both
+                const canX = !this.sheet && this.onSwipe && !bar && !tab && this.downAt;
+                const canY = !this.sheet && this.pageScroll && this.onScroll && !bar && !tab && this.downAt;
+                if ((canX || canY) && !this.dragging) {
+                    const ax = Math.abs(x - this.downAt.x), ay = Math.abs(y - this.downAt.y);
+                    if ((canX && ax > 14) || (canY && ay > 14)) { this.dragging = true; this.dragAxis = canX && (!canY || ax >= ay) ? 'x' : 'y'; }
                 }
-                if (!this.sheet && this.pageScroll && this.onScroll && !bar && !tab && this.downAt) {
-                    if (!this.dragging && Math.abs(y - this.downAt.y) > 14) this.dragging = true;
-                    if (this.dragging) this._scrollBy(this.lastY - y);
+                if (canX && this.dragging && this.dragAxis === 'x') {
+                    let moved = false;
+                    try { moved = !!this.onSwipe(this.lastX - x, this.downAt.x, this.downAt.y); } catch (e) { this.log.error('swipe', e); }
+                    if (moved) this.tickHandlers.forEach((fn) => fn());
                 }
+                if (canY && this.dragging && this.dragAxis === 'y') this._scrollBy(this.lastY - y);
                 if (this.sheet && this.sheet.scroll && !bar && this.downAt) {
                     if (!this.dragging && Math.abs(y - this.downAt.y) > 14) this.dragging = true;
                     if (this.dragging) { this.sheet.scroll(this.lastY - y); this._paintSheet(); }

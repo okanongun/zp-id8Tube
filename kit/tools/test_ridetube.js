@@ -8,6 +8,7 @@
 //   node kit/tools/test_ridetube.js
 
 const assert = require('assert');
+process.env.MGU_RT_EASE_MS = '0';        // glides to a place arrive at once (their end is what is checked)
 process.env.MGU_RT_SPLASH_MS = '0';      // (the start screen has its own check: test_ridetube8.js)
 const fs = require('fs');
 const net = require('net');

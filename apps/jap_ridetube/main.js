@@ -54,10 +54,12 @@ const { keyboardSheet } = require('./kit/keyboard');
 const Parked = require('./kit/parked');
 const { Ctl, Model, clock, SOCKET, FEEDS, SHELF_MAX } = require('./yt');
 const { spell } = require('./speller');
+const { logo: logoPixels } = require('./logo');
 
 const W = PAGE.w, H = PAGE.h;                             // 1600 x 520 (iDrive 8: 2080 x 520)
 const BOX = { x: 12, y: 38, w: W - 24, h: 432 };         // the video, in the page's visible part (y 38..520)
 const VID = 1, VPATH = process.env.MGU_YT_VIDEO || '/dev/shm/mgu-video-ridetube';     // (env: tests)
+const LOGO_PID = 2;                                       // the picture id of the app's logo (the start screen)
 const POOL0 = 8, POOL = 56;                               // picture ids POOL0.. for the thumbs drawn (a pool, by video)
 const TOP = 38;                                          // the page shows from here down (the kit: y 38..520 + extra)
 const RAIL_W = 116;                                      // the icon rail, x 12..116
@@ -65,6 +67,11 @@ const X0 = 136, TW = 320, TH = 180, PITCH = 348;          // tiles: 16:9 thumbs,
 const PER_ROW = Math.floor((W - X0 - TW) / PITCH) + 1;      // (4; iDrive 8's wider page: 5, the sixth peeking)
 const TILE_H = TH + 98, HEAD_H = 50, SHELF_GAP = 30, GRID_GAP = 22;   // a tile with its text; a shelf's title row
 const SPLASH_MS = process.env.MGU_RT_SPLASH_MS === undefined ? 1800 : Number(process.env.MGU_RT_SPLASH_MS);   // the start screen (env: tests)
+// motion (env: tests): EASE_MS, the time constant of a glide to a place (a shelf turned, the page moved by the
+// controller; 0: at once); FRICTION_MS, how long a page let go by a finger runs on
+const EASE_MS = process.env.MGU_RT_EASE_MS === undefined ? 90 : Number(process.env.MGU_RT_EASE_MS);
+const FRICTION_MS = 325, DOUBLE_TAP_MS = 400;
+const DIMS = { 100: 0, 85: 0.15, 70: 0.3, 55: 0.45 };   // app.json's Picture brightness: how dark a veil over the picture
 const ZOOMS = ['fit', 'z1', 'z2', 'fill'];               // app.json's Picture size values (iDrive 8), in the button's order
 const ZOOM_NAMES = { fit: 'Fit', z1: 'Zoom 1', z2: 'Zoom 2', fill: 'Fill' };
 const OVERLAY_MS = 4000;                                 // the player's controls hide this long after a tap (playing)
@@ -107,8 +114,10 @@ mgu.run({
             if (mode === 'subs') model.loadChannels();                    // Home's last shelf (one request at a time: idempotent)
         };
         const backKey = {};                              // page -> the tile the controller was on when it was left
+        // motion (see animate): a page running on after a finger, the place it glides to, the finger and its last moves
+        let fling = null, pageTo = null, finger = false, drag = [], shDrag = null, blockTap = 0, lastAnim = 0;
         function show(m) {
-            if (m !== mode) { dirty = true; if (laid.mode === mode && laid.where[focusKey]) backKey[mode] = focusKey; }   // (a tile of this page)
+            if (m !== mode) { dirty = true; fling = null; pageTo = null; shDrag = null; if (laid.mode === mode && laid.where[focusKey]) backKey[mode] = focusKey; }   // (a tile of this page)
             mode = m;
             if (m !== 'player') browse = m; else wake();
             openFeed(); sync(); labels();
@@ -215,18 +224,38 @@ mgu.run({
         // it: the tile tapped (its title and channel show while the video is prepared)
         // list: the row it was picked from; the videos after it play next when one ends (autoplay)
         const QUALITIES = ['auto', '720', '480', '360'];   // app.json's Video quality values, in the button's order
-        let queue = [], nextAt = 0;
-        function play(id, it, list) {
+        // hist: the videos played before this one (the player's Previous goes back through them), cur: this one
+        let queue = [], nextAt = 0, hist = [], cur = null;
+        const start = (id, it) => model.play(id, rect(), ID8 ? false : settings.get('fill') !== false, it, { quality: settings.get('quality'), skip: sbSkip() });
+        function play(id, it, list, back) {
             show('player');
             if (list) { const i = list.findIndex((r) => r.id === id); queue = list.slice(i + 1).filter((r) => r && !r.act && /^[\w-]{11}$/.test(r.id)); }
             nextAt = 0;
             if (model.id === id && model.active()) return;
-            model.play(id, rect(), ID8 ? false : settings.get('fill') !== false, it, { quality: settings.get('quality'), skip: sbSkip() });
+            if (cur && cur.id !== id && !back) { hist.push(cur); if (hist.length > 30) hist.shift(); }
+            cur = { id, it: it || model.item(id) || { id } };
+            start(id, it);
         }
-        // from render: ended with a next one -> 5 s to see what comes, then it plays (back to the list cancels)
+        // the player's Next: the next of the row the video was picked from. Previous: the video's start, or - in its
+        // first 5 s - the video played before it (this one goes back to the head of what plays next)
+        function playNext() { const r = queue.shift(); if (r) play(r.id, r); }
+        function playPrev() {
+            if (model.elapsed > 5000 || !hist.length) { if (model.active()) model.skip(-model.elapsed); return; }
+            const p = hist.pop();
+            if (cur) queue.unshift(cur.it && cur.it.id ? cur.it : { id: cur.id });
+            play(p.id, p.it, null, true);
+        }
+        // from render, a video ended (Settings, "When a video ends"): the next of its row after 5 s to see what comes
+        // (back to the list cancels), the same video again, or nothing
+        const afterEnd = () => { const a = String(settings.get('after') || 'next'); return a === 'repeat' || a === 'stop' ? a : 'next'; };
         function autoNext() {
-            if (model.state !== 'ended' || !queue.length || mode !== 'player') { nextAt = 0; return null; }
-            if (!nextAt) { nextAt = Date.now() + 5000; wake(); }
+            const after = afterEnd();
+            if (model.state !== 'ended' || mode !== 'player' || after === 'stop' || (after === 'next' && !queue.length)) { nextAt = 0; return null; }
+            if (!nextAt) { nextAt = Date.now() + (after === 'repeat' ? 1500 : 5000); wake(); }
+            if (after === 'repeat') {
+                if (Date.now() >= nextAt && model.id) { nextAt = 0; start(model.id, cur && cur.id === model.id ? cur.it : model.item(model.id)); }
+                return null;
+            }
             if (Date.now() < nextAt) return queue[0];
             const r = queue.shift();
             play(r.id, r);
@@ -354,8 +383,27 @@ mgu.run({
         // it stays while there is no moving picture to look at
         const pinned = () => model.state !== 'playing' || !videoShown || noVideo() || !!askSeg();
         const overlay = () => pinned() || Date.now() < ovUntil || Date.now() < qrUntil;
-        // a tap beside the controls (no target): hides them
-        if (ctx.onTap) ctx.onTap(() => { if (mode === 'player' && !pinned() && overlay()) { ovUntil = 0; dirty = true; } });
+        // a tap beside the controls (no target): hides them. Two quick taps on the left or the right third of the
+        // picture: 10 s back or on (each further tap 10 s more), a badge says how far - the controls stay away
+        let lastTap = { t: 0, side: 0 }, badge = null, fullGeo = null, ovAt = 0;
+        const liveNow = () => model.state === 'playing' || model.state === 'paused';
+        function tapZone(side, single) {
+            const now = Date.now();
+            if (side && lastTap.side === side && now - lastTap.t < DOUBLE_TAP_MS && liveNow() && !noVideo()) {
+                model.skip(side * 10000);
+                badge = { side, n: (badge && badge.side === side && badge.until > now ? badge.n : 0) + 10, until: now + 800 };
+                lastTap = { t: now, side };
+                ovUntil = 0; dirty = true;
+                return;
+            }
+            lastTap = { t: now, side };
+            single();
+        }
+        if (ctx.onTap) ctx.onTap((x) => {
+            if (mode !== 'player') return;
+            const g = fullGeo, X = g && typeof x === 'number' ? x + g.dx : NaN, side = g && X < g.SW / 3 ? -1 : g && X > g.SW * 2 / 3 ? 1 : 0;
+            tapZone(side, () => { if (!pinned() && overlay()) { ovUntil = 0; dirty = true; } });
+        });
         // the controller pushed left in the player: back to the list it came from; pushed left at a channel's
         // edge (the rail): back to Subscriptions. Both put the controller back on the tile it left from
         if (ctx.onBack) ctx.onBack((edge) => {
@@ -547,17 +595,17 @@ mgu.run({
         function findChannel() {
             if (ID8) {
                 ctx.sheet(keyboardSheet({ title: 'Find a channel', hint: 'A name, or its first letter', action: 'Find', locked: typingLocked,
-                    onDone: (t) => { chanQ = String(t).trim(); vs('subs').sy = 0; vs('subs').off = {}; dirty = true; show('subs'); } }));
+                    onDone: (t) => { chanQ = String(t).trim(); vs('subs').sy = 0; resetOff('subs'); dirty = true; show('subs'); } }));
                 return;
             }
             spell(ctx.app, 'Find a channel').then((t) => {
                 if (t === null || t === undefined) { ui.open('VIEW'); return; }
-                chanQ = String(t).trim(); vs('subs').sy = 0; vs('subs').off = {}; dirty = true;
+                chanQ = String(t).trim(); vs('subs').sy = 0; resetOff('subs'); dirty = true;
                 show('subs'); ui.open('VIEW');
             }).catch((e) => log.error('speller', e));
         }
         let chanFrom = 'subs';
-        function openChannel(c) { if (mode !== 'channel') chanFrom = mode; model.openChannel(c.id, c.title); show('channel'); vs('channel').sy = 0; vs('channel').off = {}; }
+        function openChannel(c) { if (mode !== 'channel') chanFrom = mode; model.openChannel(c.id, c.title); show('channel'); vs('channel').sy = 0; resetOff('channel'); }
         function chanSections() {
             const ch = model.chans;
             if (!ch || (!ch.items.length && ch.loading)) return [{ title: 'Channels', sub: 'Loading...', items: [], chan: true }];
@@ -565,7 +613,7 @@ mgu.run({
             const find = { id: '::find', title: chanQ ? 'Search again' : 'Search channels', sub: 'A letter, or a word', act: findChannel, glyph: KEYS };
             if (!chanQ) return [{ title: 'Channels', sub: ch.items.length + ' subscriptions, A-Z', items: [find].concat(ch.items), chan: true }];
             const hits = model.findChannels(chanQ);
-            const all = { id: '::all', title: 'All channels', sub: ch.items.length + ' subscriptions', act: () => { chanQ = ''; vs('subs').off = {}; dirty = true; }, glyph: ALL };
+            const all = { id: '::all', title: 'All channels', sub: ch.items.length + ' subscriptions', act: () => { chanQ = ''; resetOff('subs'); dirty = true; }, glyph: ALL };
             return [{ title: (chanQ.length === 1 ? 'Channels starting with “' : 'Channels matching “') + chanQ + '”',
                 sub: hits.length ? hits.length + (hits.length === 1 ? ' channel' : ' channels') : 'none', items: [find, all].concat(hits), chan: true, grid: true }];
         }
@@ -598,7 +646,8 @@ mgu.run({
          * there, onPageFocus brings it into view). Keys: <mode letter>:<row>:<video id>.
          */
         const view = {};                                  // mode -> { sy, off: { row: first tile shown } }
-        const vs = (m) => view[m] || (view[m] = { sy: 0, max: 0, off: {} });
+        const vs = (m) => view[m] || (view[m] = { sy: 0, max: 0, off: {}, sh: {} });   // sh: where a shelf is drawn (glides to off)
+        const resetOff = (m) => { const st = vs(m); st.off = {}; st.sh = {}; };
         let laid = { mode: null, rows: [], viewH: 0, where: {} }, focusKey = null, dwell = null;
         function layout(sections) {
             const rows = [];
@@ -632,6 +681,8 @@ mgu.run({
                 }
                 const max = row.hs ? n - PER_ROW : 0, off = Math.max(0, Math.min(max, st.off[ri] || 0));
                 st.off[ri] = off;
+                // (drawn where it is on its way there: animate() moves sh to off; a finger moves sh itself)
+                const sh = st.sh[ri] = Math.max(0, Math.min(max, row.hs && st.sh[ri] >= 0 ? st.sh[ri] : off));
                 // touch: arrows where tiles are hidden (recorded first: a tap on one is not the tile under it)
                 if (cv.own && shown && row.hs) {
                     if (off > 0) after.push(chevron(cv, X0 + 4, ty + TH / 2, -1, () => { st.off[ri] = Math.max(0, off - PER_ROW); dirty = true; }, letter + ':' + ri + ':<'));
@@ -640,16 +691,17 @@ mgu.run({
                         after.push(chevron(cv, W - 48, ty + TH / 2, 1, () => { st.off[ri] = Math.min(max, off + PER_ROW); dirty = true; }, letter + ':' + ri + ':>'));
                     }
                 }
-                for (let i = Math.max(0, off - 1); i <= Math.min(n - 1, off + PER_ROW); i++) {
-                    const r = row.items[i], x = X0 + (i - off) * PITCH, key = letter + ':' + ri + ':' + r.id;
+                for (let i = Math.max(0, Math.floor(sh) - 1); i <= Math.min(n - 1, Math.ceil(sh) + PER_ROW); i++) {
+                    const r = row.items[i], x = X0 + (i - sh) * PITCH, key = letter + ':' + ri + ':' + r.id;
                     if (shown && x + TW > RAIL_W && x < W) (row.chan || r.act ? drawChan : drawTile)(cv, r, x, ty, key);
-                    const run = r.act ? () => r.act() : row.chan ? () => openChannel(r) : () => play(r.id, r, row.items);
+                    const go = r.act ? () => r.act() : row.chan ? () => openChannel(r) : () => play(r.id, r, row.items);
+                    const run = () => { if (Date.now() < blockTap) return undefined; return go(); };   // (a finger that stopped a running page picks nothing)
                     if (cv.own) { cv.target(x - 10, ty - 10, TW + 20, TILE_H + 16, run, key, 18); where[key] = { ri, i }; }
                 }
             });
             after.forEach((fn) => fn());
             cv.noclip();
-            laid = { mode, rows: L.rows, viewH, where };
+            laid = { mode, rows: L.rows, viewH, where, sy: st.sy };
             if (cv.own && st.max > 0) cv.scroll = true;
         }
         // the controller on a tile: its shelf turned and the page scrolled so that it shows whole
@@ -668,16 +720,99 @@ mgu.run({
                 const off = st.off[w.ri] || 0;
                 if (w.i < off) st.off[w.ri] = w.i; else if (w.i > off + PER_ROW - 1) st.off[w.ri] = w.i - PER_ROW + 1;
             }
-            const top = row.y - 8, bot = row.y + row.h;
-            if (top < st.sy) st.sy = Math.max(0, top); else if (bot > st.sy + laid.viewH) st.sy = Math.min(st.max, bot - laid.viewH);
+            const top = row.y - 8, bot = row.y + row.h, at = pageTo != null ? pageTo : st.sy;
+            fling = null;
+            if (top < at) pageTo = Math.max(0, top); else if (bot > at + laid.viewH) pageTo = Math.min(st.max, bot - laid.viewH);
             dirty = true;
         });
+        /*
+         * Motion. A page follows a finger at once and, let go while moving, runs on and slows down (a finger put
+         * on it stops it, and picks nothing with that tap). Moved by the controller it glides to its place. A shelf
+         * follows a finger dragged sideways on it and settles on a tile; its arrows glide it four tiles on.
+         * animate() is render's: it moves what is on its way and says whether anything moved.
+         */
+        const clampY = (st, y) => Math.max(0, Math.min(st.max, y));
+        function animate(now) {
+            const dt = Math.min(64, Math.max(1, now - (lastAnim || now)));
+            lastAnim = now;
+            if (!browsing()) { fling = null; pageTo = null; shDrag = null; return false; }
+            const st = vs(mode), k = EASE_MS > 0 ? 1 - Math.exp(-dt / EASE_MS) : 1;
+            let moving = false;
+            if (fling) {
+                const y = clampY(st, st.sy + fling.v * dt);
+                fling.v *= Math.exp(-dt / FRICTION_MS);
+                if (y === st.sy || Math.abs(fling.v) < 0.05) fling = null;
+                st.sy = y; moving = true;
+            } else if (pageTo != null) {
+                const to = clampY(st, pageTo);
+                st.sy += (to - st.sy) * k;
+                if (Math.abs(to - st.sy) < 0.5) { st.sy = to; pageTo = null; }
+                moving = true;
+            }
+            Object.keys(st.off).forEach((ri) => {
+                const to = st.off[ri], sh = st.sh[ri];
+                if (!(sh >= 0) || sh === to || (shDrag && shDrag.st === st && String(shDrag.ri) === ri)) return;
+                const v = sh + (to - sh) * k;
+                st.sh[ri] = Math.abs(to - v) < 0.004 ? to : v;
+                moving = true;
+            });
+            return moving;
+        }
+        // how fast the finger went over its last 100 ms (units of `drag`'s d per ms)
+        const speed = () => {
+            const now = Date.now(), recent = drag.filter((m) => now - m.t <= 100);
+            if (recent.length < 2) return 0;
+            return recent.reduce((a, m) => a + m.d, 0) / Math.max(16, now - recent[0].t);
+        };
         if (ctx.onScroll) ctx.onScroll((dy) => {
             if (!browsing()) return false;
-            const st = vs(mode), y = Math.max(0, Math.min(st.max, st.sy + dy)), moved = y !== st.sy;
+            const st = vs(mode);
+            fling = null;
+            if (!finger) {                          // the controller turned on the page: it glides there
+                const from = pageTo != null ? pageTo : st.sy, to = clampY(st, from + dy);
+                if (to === from) return false;
+                pageTo = to; dirty = true;
+                return true;
+            }
+            pageTo = null;
+            const y = clampY(st, st.sy + dy), moved = y !== st.sy;
             st.sy = y;
+            drag.push({ d: dy, t: Date.now() }); if (drag.length > 12) drag.shift();
             if (moved) dirty = true;
             return moved;
+        });
+        // a finger dragged sideways on a shelf: its tiles follow
+        if (ctx.onSwipe) ctx.onSwipe((dx, x0, y0) => {
+            if (!browsing() || laid.mode !== mode || !(x0 > RAIL_W)) return false;
+            const st = vs(mode);
+            let ri = shDrag && shDrag.st === st ? shDrag.ri : -1;
+            if (ri < 0) ri = laid.rows.findIndex((row) => { const ty = TOP + row.y - st.sy + (row.title ? HEAD_H : 0); return row.hs && y0 >= ty - 10 && y0 < ty + TILE_H + 16; });
+            if (ri < 0) return false;
+            const row = laid.rows[ri], max = row.items.length - PER_ROW, was = st.sh[ri] >= 0 ? st.sh[ri] : st.off[ri] || 0;
+            const sh = Math.max(0, Math.min(max, was + dx / PITCH));
+            shDrag = { st, ri, max };
+            st.sh[ri] = sh;
+            drag.push({ d: dx / PITCH, t: Date.now() }); if (drag.length > 12) drag.shift();
+            dirty = true;
+            return true;
+        });
+        if (ctx.onFinger) ctx.onFinger((phase, axis) => {
+            if (phase === 'down') {
+                finger = true; drag = [];
+                if (fling) { fling = null; blockTap = Date.now() + 350; }
+                return;
+            }
+            finger = false;
+            if (axis === 'y' && browsing()) {
+                const v = speed();
+                if (Math.abs(v) > 0.3) { fling = { v: Math.max(-6, Math.min(6, v)) }; lastAnim = Date.now(); dirty = true; }
+            } else if (axis === 'x' && shDrag) {
+                // it settles on a tile: the one it is at, or a bit further the way it was going
+                const st = shDrag.st, ri = shDrag.ri, v = speed();
+                st.off[ri] = Math.max(0, Math.min(shDrag.max, Math.round(st.sh[ri] + Math.max(-3, Math.min(3, v * 220)))));
+                lastAnim = Date.now(); dirty = true;
+            }
+            shDrag = null; drag = [];
         });
 
         // a message in the middle of the page (RideTube's mark over it), a grey line under it
@@ -898,11 +1033,45 @@ mgu.run({
                 if (z > 1.001) cv.clip(0, 0, pl.w, pl.h).video(VID, pl.w * (1 - z) / 2, pl.h * (1 - z) / 2, pl.w * z, pl.h * z, 0).noclip();
                 else cv.video(VID, 0, 0, pl.w, pl.h, 0);
             }
-            if (!overlay() && !pod) { cv.xf(); OVK.forEach((k) => tg(0, 0, SW, SH, wake, k, 0, k === 'ov:bar' ? turnSeek : undefined)); return; }
+            // Settings, Picture brightness: a dark veil over the picture (a bright video at night), under the controls
+            const veil = videoShown && !pod ? DIMS[String(settings.get('dim'))] || 0 : 0;
+            if (veil > 0) cv.fillRect(0, 0, pl.w, pl.h, [0, 0, 0, Math.round(255 * veil)]);
+            fullGeo = { SW, dx };
+            const now = Date.now(), cyB = SH / 2 - 6;
+            // the badge of a double tap: "- 10 s" on the left, "+ 10 s" on the right, with or without the controls
+            const drawBadge = () => {
+                if (!badge || badge.until <= now) { badge = null; return; }
+                const bx = badge.side < 0 ? SW * 0.2 : SW * 0.8;
+                cv.xf(s, 0, 0);
+                cv.alpha(Math.min(1, (badge.until - now) / 250));
+                cv.circle(bx, cyB, 74, '#000000a6');
+                cv.text((badge.side < 0 ? '- ' : '+ ') + badge.n + ' s', bx, cyB + 12, 36, '#ffffff', { literal: true, font: 'bold', align: 'center' });
+                cv.alpha(1);
+                dirty = true;                                   // (it fades: the next frame too)
+            };
+            if (!overlay() && !pod) {
+                drawBadge();
+                cv.xf();
+                ovAt = 0;
+                // a finger: the left and right thirds count their taps (two: 10 s back / on), any tap shows the controls
+                if (ID8 && cv.own && liveNow()) { tg(0, 0, SW / 3, SH, () => tapZone(-1, wake), 'tap:l', 0); tg(SW * 2 / 3, 0, SW / 3, SH, () => tapZone(1, wake), 'tap:r', 0); }
+                OVK.forEach((k) => tg(0, 0, SW, SH, () => tapZone(0, wake), k, 0, k === 'ov:bar' ? turnSeek : undefined));
+                return;
+            }
             cv.xf(s, 0, 0);
             const LX = HMI.left / s, act = model.active(), live = model.state === 'playing' || model.state === 'paused';
             const cx = SW / 2, cy = SH / 2 - 6, run = (fn) => () => { fn(); wake(); };
             if (pod) { drawPodcast(cv, SW, SH, LX, tg, run, live); hmiIcons(cv); return; }
+            // the controls come in over 140 ms (not when they stay: preparing, paused, no picture)
+            if (!ovAt) ovAt = pinned() ? 1 : now;
+            const fade = Math.min(1, (now - ovAt) / 140);
+            if (fade < 1) { cv.alpha(fade); dirty = true; }
+            // a tap just showed them: a second quick one on that side is the double tap, whatever control is under it
+            if (ID8 && cv.own && live && lastTap.side && now - lastTap.t < DOUBLE_TAP_MS) {
+                const sd = lastTap.side;
+                tg(sd < 0 ? 0 : SW * 2 / 3, 0, SW / 3, SH, () => tapZone(sd, wake), sd < 0 ? 'tap:l' : 'tap:r', 0);
+                dirty = true;
+            }
             // a round control: dark, white when the controller is on it (its glyph dark then)
             const ctl = (key, x, y, r, fn, glyph) => {
                 const f = focusKey === key;
@@ -968,6 +1137,15 @@ mgu.run({
                     else { cv.roundRect(cx - 17, cy - 22, 12, 44, 3, c); cv.roundRect(cx + 5, cy - 22, 12, 44, 3, c); }
                 });
                 skip('ov:ff', cx + 210, 1, 10000);
+                // iDrive 8: the video before (or this one's start) and the next of the row it was picked from
+                if (ID8 && cv.own) {
+                    const step = (key, x, dir, fn) => ctl(key, x, cy, 36, fn, (c) => {
+                        cv.quad([[x - 12 * dir, cy - 13], [x + 6 * dir, cy], [x - 12 * dir, cy + 13], [x - 12 * dir, cy - 13]], c);
+                        cv.fillRect(x + (dir > 0 ? 8 : -12), cy - 13, 4, 26, c);
+                    });
+                    step('ov:prev', cx - 380, -1, playPrev);
+                    if (queue.length) step('ov:next', cx + 380, 1, playNext);
+                }
                 // right: Video quality (a press takes the next one; the video starts again there) and zoom (fill crops)
                 const qv = String(settings.get('quality') || 'auto'), fl = settings.get('fill') !== false, qx = SW - 330, zx = SW - 150;
                 ctl('ov:q', qx, cy, 42, () => { const q = QUALITIES[(QUALITIES.indexOf(qv) + 1) % QUALITIES.length]; settings.set('quality', q); model.quality(q); },
@@ -1034,6 +1212,8 @@ mgu.run({
                 cv.text(tt, sx + 35, sy + 40, 28, f ? '#0f0f0f' : '#ffffff', LITB);
                 tg(sx, sy, w2, 60, run(sbJump(ask)), 'ov:sbskip', 30);
             }
+            cv.alpha(1);
+            drawBadge();
             hmiIcons(cv);
         }
         // the HMI's home and back arrow column: its taps stay the HMI's, but no black hole over the video;
@@ -1049,16 +1229,23 @@ mgu.run({
         }
         // the start screen: the first time the app is shown after its start, for SPLASH_MS (a tap ends it) - the
         // mark (a rev counter around a play mark), the app's name, who made the iDrive 8 version, and whose work it is based on
-        let splashAt = 0, splashDone = !(SPLASH_MS > 0);
+        let splashAt = 0, splashDone = !(SPLASH_MS > 0), logoPic = null;
         function drawSplash(cv, t) {
             if (cv.own) cv.chrome = null;      // no header over it
             const a = Math.max(0, Math.min(1, t / 250, (SPLASH_MS - t) / 250));
             const cx = W / 2, cy = TOP + (H - TOP) / 2, mx = cx - 250, my = cy - 6;
             cv.alpha(a);
-            // (angles: degrees clockwise from 12 o'clock - 270 degrees of dial, the last 53 red)
-            cv.arc(mx, my, 62, 72, -135, 68, '#e6ebf5', { round: true }).arc(mx, my, 62, 72, 82, 135, '#ff3b30', { round: true });
-            cv.circle(mx, my, 46, '#ff8a1f22');
-            tri(cv, mx, my, 62, '#ffa62b');
+            // the app's own logo (the icon's picture) where the renderer draws pictures; else a drawn mark
+            if (logoPic === null) {
+                const px = gpu() ? logoPixels() : null;
+                logoPic = px ? (setImage(LOGO_PID, px.w, px.h, px.buf), true) : false;
+            }
+            if (logoPic) cv.picture(LOGO_PID, mx - 82, my - 82, 164, 164, 36);
+            else {
+                cv.arc(mx, my, 62, 72, -135, 68, '#e6ebf5', { round: true }).arc(mx, my, 62, 72, 82, 135, '#ff3b30', { round: true });
+                cv.circle(mx, my, 46, '#ff8a1f22');
+                tri(cv, mx, my, 62, '#ffa62b');
+            }
             cv.text('BeeMTube2', cx - 140, cy - 18, 76, '#ffffff', LITB);
             cv.text('Waliworld', cx - 136, cy + 40, 34, C.amber, LITB);
             cv.text('#tunedbywali', cx - 136 + cv.textWidth('Waliworld', 34, LITB) + 24, cy + 40, 34, '#e6ebf5', LIT);
@@ -1080,6 +1267,7 @@ mgu.run({
                 splashDone = true; dirty = true;
             }
             upNext = autoNext();
+            if (animate(now)) dirty = true;
             // redraw on a change (and 4 times a second); unchanged, the same frame again keeps the layer alive (>= 1 message/s)
             if (!last || dirty || model.rev !== lastRev || now - lastT > 250) {
                 dirty = false; lastRev = model.rev; lastT = now;

@@ -9,6 +9,7 @@
 //   node kit/tools/test_ridetube8.js
 
 const assert = require('assert');
+process.env.MGU_RT_EASE_MS = '0';         // glides to a place arrive at once (their end is what is checked); a page let go runs on as on the car
 const fs = require('fs');
 const net = require('net');
 const os = require('os');
@@ -151,6 +152,31 @@ async function main() {
     void row0;
     console.log('ok   Search: the on-screen keyboard (typed, backspace, Search), results five a row');
 
+    // motion: the page follows a finger, and let go while moving it runs on and comes to rest; a finger put on
+    // the running page stops it and picks nothing
+    const tileY = () => { const t = target('r:1:' + items[5].id); return t ? t.y : NaN; };
+    const frames = async (n, ms) => { const ys = []; for (let i = 0; i < n; i++) { await sleep(ms); await hu.loopFn(); ys.push(tileY()); } return ys; };
+    const fx = 900, fy0 = 420, y0 = tileY();
+    disp._touch(1, fx, fy0);
+    for (let i = 1; i <= 6; i++) { await sleep(16); disp._touch(2, fx, fy0 - i * 14); }
+    disp._touch(3, fx, fy0 - 84);                   // let go while moving (a finger that rests first leaves it there)
+    const run1 = await frames(2, 30);
+    assert.ok(run1[0] < y0 - 60, 'it follows the finger: ' + y0 + ' -> ' + run1[0]);
+    assert.ok(run1[0] < y0 - 72 && run1[1] < run1[0] - 2, 'let go, it runs on: ' + y0 + ' then ' + run1.join(', '));
+    const playsM = d.cmds('play').length, tgt = target('r:1:' + items[5].id);
+    await tapTarget(tgt);                           // a finger on the running page
+    const held = await frames(3, 30);
+    assert.ok(Math.abs(held[2] - held[0]) < 0.01 && held[0] > y0 - 159, 'a finger stops it: ' + held.join(', '));
+    assert.strictEqual(d.cmds('play').length, playsM, 'and picks nothing with that tap');
+    // the other way, to the top: it stops there
+    disp._touch(1, fx, 200);
+    for (let i = 1; i <= 8; i++) { await sleep(16); disp._touch(2, fx, 200 + i * 30); }
+    disp._touch(3, fx, 440);
+    const back = await frames(40, 25);
+    assert.ok(Math.abs(back[39] - y0) < 0.01 && back[39] === back[38], 'run back to the top, at rest: ' + y0 + ' / ' + back.slice(-3).join(', '));
+    await sleep(380);                               // (taps count again)
+    console.log('ok   motion: the page follows a finger, runs on when let go, stops under a finger and at its ends');
+
     // driving: the keyboard's keys are locked, the recent searches still work
     drive(50);
     await tapTarget(target('rail:search'));
@@ -209,6 +235,73 @@ async function main() {
     assert.deepStrictEqual(videoOp().box, [0, 0, 2880, 764]);
     assert.deepStrictEqual(d.got.slice(sentZ).filter((m) => m.cmd === "fill" || m.cmd === "play"), [], 'nothing asked of the service for it');
     console.log('ok   picture size: Fit, two zooms, Fill (' + shownW.join(', ') + ' px wide), drawn by the renderer - the sound plays on');
+
+    // Previous and Next: the next of the row the video was picked from; Previous in a video's first seconds goes
+    // back to the one before, which leaves this one next again
+    const playing = async (it) => { d.send({ ev: 'state', state: 'playing', id: it.id, title: it.title }); await sleep(80); await hu.loopFn(); };
+    assert.ok(target('ov:next') && target('ov:prev'), 'the overlay has them: ' + disp.pageTargets.map((t) => t.key).join(' '));
+    let np = d.cmds('play').length;
+    await tapTarget(target('ov:next'));
+    await until(() => d.cmds('play').length === np + 1, 1000, 'Next plays');
+    assert.strictEqual(d.cmds('play')[np].id, items[1].id, 'the next of the row');
+    await playing(items[1]);
+    await tapTarget(target('ov:prev'));
+    await until(() => d.cmds('play').length === np + 2, 1000, 'Previous plays');
+    assert.strictEqual(d.cmds('play')[np + 1].id, items[0].id, 'the video before');
+    await playing(items[0]);
+    await tapTarget(target('ov:next'));
+    await until(() => d.cmds('play').length === np + 3, 1000, 'Next again');
+    assert.strictEqual(d.cmds('play')[np + 2].id, items[1].id, 'the one left is next again');
+    await playing(items[1]);
+    await tapTarget(target('ov:prev'));
+    await until(() => d.cmds('play').length === np + 4, 1000, 'and back');
+    await playing(items[0]);
+    console.log('ok   Previous and Next: through the row and back');
+
+    // two quick taps on the right third: 10 s on, the left: 10 s back; one tap only shows the controls
+    const parkedFor = async (ms) => { for (let t = 0; t < ms; t += 300) { drive(0); await sleep(300); } };   // (the car keeps saying it stands)
+    await parkedFor(4200);
+    await hu.loopFn();
+    assert.ok(target('tap:l') && target('tap:r') && !target('ov:next'), 'the controls are away: ' + disp.pageTargets.map((t) => t.key).join(' '));
+    const seeks = () => d.got.filter((m) => m.cmd === 'seek' || m.cmd === 'skip').length;
+    let sk = seeks();
+    await tapTarget(target('tap:r'));
+    await hu.loopFn();
+    assert.strictEqual(seeks(), sk, 'one tap seeks nothing');
+    assert.ok(target('ov:prev'), 'it shows the controls');
+    await tapTarget(target('tap:r'));
+    await until(() => seeks() === sk + 1, 1000, 'the second tap seeks');
+    await hu.loopFn();
+    assert.ok(target('tap:l') && !target('ov:prev'), 'and the controls are away again: ' + disp.pageTargets.map((t) => t.key).join(' '));
+    snap('player-double-tap');
+    await parkedFor(900);
+    await hu.loopFn();
+    sk = seeks();
+    await tapTarget(target('tap:l')); await hu.loopFn(); await tapTarget(target('tap:l'));
+    await until(() => seeks() === sk + 1, 1000, 'the left side too');
+    console.log('ok   double tap: 10 s on (right) and back (left), a single tap shows the controls');
+
+    // Picture brightness: a veil over the picture; When a video ends, Play it again: the same video after a moment
+    await hu.loopFn();
+    const wordsBefore = disp.last.frame.words().length;
+    hu.ctx.settings.set('dim', '70');
+    await sleep(300); await hu.loopFn();
+    assert.ok(disp.last.frame.words().length > wordsBefore, 'the veil is drawn');
+    hu.ctx.settings.set('dim', '100');
+    hu.ctx.settings.set('after', 'repeat');
+    np = d.cmds('play').length;
+    d.send({ ev: 'state', state: 'ended', id: items[0].id, title: items[0].title });
+    for (let i = 0; i < 24 && d.cmds('play').length === np; i++) { drive(0); await sleep(100); await hu.loopFn(); }
+    assert.strictEqual(d.cmds('play').length, np + 1, 'played again');
+    assert.strictEqual(d.cmds('play')[np].id, items[0].id, 'the same video');
+    hu.ctx.settings.set('after', 'stop');
+    d.send({ ev: 'state', state: 'ended', id: items[0].id, title: items[0].title });
+    for (let i = 0; i < 12; i++) { drive(0); await sleep(100); await hu.loopFn(); }
+    assert.strictEqual(d.cmds('play').length, np + 1, 'Stop: nothing plays by itself');
+    hu.ctx.settings.set('after', 'next');
+    await playing(items[0]);
+    await hu.loopFn();
+    console.log('ok   picture brightness; when a video ends: again, or nothing');
     drive(60);
     await sleep(400);
     await hu.loopFn();
@@ -282,6 +375,46 @@ async function main() {
     await sleep(100);
     await hu.loopFn();
     console.log('ok   player: 1358x764 asked, overlay, podcast mode while driving, the search for sound and "No sound?", back to the list');
+
+    // shelves: a finger dragged sideways on one moves its tiles and it settles on a tile (further the way it was
+    // going when let go while moving); the page does not move up or down with it, the other shelf stays; the arrow
+    // turns it on
+    d.send({ ev: 'auth', state: 'signed_in' });
+    await sleep(50);
+    await hu.loopFn();
+    await tapTarget(target('rail:home'));
+    await sleep(60);
+    d.send({ ev: 'feed', which: 'home', items, shelves: [{ title: 'Shelf A', items }, { title: 'Shelf B', items: items.slice(0, 8) }] });
+    await sleep(120);
+    await hu.loopFn();
+    const first = (row) => { const t = disp.pageTargets.filter((q) => new RegExp('^h:' + row + ':cat').test(q.key)).find((q) => Math.abs(q.x - 126) < 0.01); return t ? Number(t.key.slice(-2)) : -1; };
+    assert.deepStrictEqual([first(0), first(1)], [0, 0], 'both shelves at their start: ' + disp.pageTargets.map((t) => t.key + '@' + Math.round(t.x)).join(' '));
+    const t3 = target('h:0:' + items[3].id), sy0 = t3.y, hx = t3.x + 100, hy = t3.y + 120;
+    disp._touch(1, hx, hy);
+    for (let i = 1; i <= 8; i++) { await sleep(16); disp._touch(2, hx - i * 60, hy + i * 3); }
+    await hu.loopFn();
+    const mid3 = target('h:0:' + items[3].id);
+    assert.ok(Math.abs((t3.x - mid3.x) - (480 - 60)) <= 61 && mid3.y === sy0, 'the tiles follow the finger sideways, the page stays: ' + t3.x + ' -> ' + mid3.x + ', y ' + sy0 + ' -> ' + mid3.y);
+    disp._touch(2, hx - 8 * 60 - 60, hy + 24);
+    disp._touch(3, hx - 8 * 60 - 60, hy + 24);
+    await sleep(30); await hu.loopFn();
+    const after1 = first(0);
+    assert.ok(after1 >= 3 && after1 <= 7 && first(1) === 0, 'settled on a tile further on, the other shelf stays: ' + after1 + ', ' + first(1));
+    assert.ok(target('h:0:<'), 'its arrow back shows');
+    // a slow drag let go at rest: the nearest tile
+    const tk = disp.pageTargets.find((q) => /^h:0:cat/.test(q.key) && Math.abs(q.x - 126 - 348) < 0.01);
+    disp._touch(1, tk.x + 100, tk.y + 120);
+    for (let i = 1; i <= 5; i++) { await sleep(16); disp._touch(2, tk.x + 100 + i * 24, tk.y + 120); }
+    await sleep(160);
+    disp._touch(3, tk.x + 220, tk.y + 120);
+    await sleep(30); await hu.loopFn();
+    assert.strictEqual(first(0), after1, 'a short slow drag: back on the same tile');
+    await sleep(380);
+    await tapTarget(target('h:0:<'));
+    await hu.loopFn();
+    assert.strictEqual(first(0), Math.max(0, after1 - 5), 'the arrow: five tiles back');
+    snap('home-shelves');
+    console.log('ok   shelves: dragged sideways by a finger, settle on a tile, the arrows turn them');
 
     // the rail's Settings: the card (account), Sign out twice, the settings sheet
     d.send({ ev: 'auth', state: 'signed_in' });

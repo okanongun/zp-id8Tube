@@ -19,14 +19,15 @@ their names, so a car that has an earlier version updates in place.
 
 | Version | What it is | In the MGU Store: Add source | Branch |
 |---|---|---|---|
-| **Beta 3** (the main release) | BeeMTube2: app 0.6.0 - the new name and icon, picture size (zoom), the start screen. Service 0.5.2, unchanged | `waliworld/iDrive8-RideTube`, **Releases** | `main` |
+| **Beta 4** (the main release) | BeeMTube2: app 0.7.0 - pages that glide under a finger, shelves dragged sideways, double tap to seek, Previous / Next, what to do when a video ends, picture brightness, the logo on the start screen. Service 0.5.2, unchanged | `waliworld/iDrive8-RideTube`, **Releases** | `main`, `beta4` |
+| Beta 3 | BeeMTube2: app 0.6.0 - the new name, picture size (zoom), the start screen. Service 0.5.2 | the address `https://github.com/waliworld/iDrive8-RideTube/releases/download/beta3/catalog.json` | `beta3` |
 | Beta 2 | app 0.5.0 (still named RideTube): picture size, the start screen. Service 0.5.2 | the address `https://github.com/waliworld/iDrive8-RideTube/releases/download/beta2/catalog.json` | `beta2` |
 | Beta 1 (stable) | app 0.4.6, service 0.5.2: the first version confirmed on a car | the address `https://github.com/waliworld/iDrive8-RideTube/releases/download/stable-1/catalog.json` | `beta1-stable` |
 
-All three run the **same service package** (0.5.2, the one confirmed on a car); only the app differs. **To go
+All of them run the **same service package** (0.5.2, the one confirmed on a car); only the app differs. **To go
 back** on a car: add the older version's address as a source (easiest from the Store's phone page), uninstall the
-app (the service can stay), install it again from that source, restart the head unit. The releases `stable-1` and
-`beta2` and the branches `beta1-stable` and `beta2` are kept as they are for that.
+app (the service can stay), install it again from that source, restart the head unit. The releases `stable-1`,
+`beta2` and `beta3` and the branches `beta1-stable`, `beta2` and `beta3` are kept as they are for that.
 
 ## Install on an iDrive 8 car
 

@@ -90,6 +90,8 @@ function headUnit(stage, o) {
         hideButton(id, hide) { display.hideButton(id, hide); },
         onPageFocus(fn) { display.onPageFocus = fn; },
         onScroll(fn) { display.onScroll = fn; },
+        onSwipe(fn) { display.onSwipe = fn; },
+        onFinger(fn) { display.onFinger = fn; },
         onLayout(fn) { display.onLayout(fn); },
         controller: { grab(on) { display.grab(on); }, onInput(fn) { display.onCcu = fn; } },
         signals: live ? liveSignals(hu) : { watch: async (iface) => ({ iface, error: 'preview' }), proxy: async () => { throw new Error('preview'); } },
