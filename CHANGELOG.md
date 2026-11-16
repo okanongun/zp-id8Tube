@@ -2,6 +2,9 @@
 
 ## Beta 4 - App 0.7.0: a smoother app, more in the player
 
+*The front page (README) was rewritten for BeeMTube2 afterwards: new screenshots (`docs/readme_shots.js`, rendered
+with invented demo data), every feature, the car it is confirmed on.*
+
 The main release. The service is not changed (0.5.2: the very package confirmed on a car). Not confirmed on a car
 yet; Beta 3 is kept as the release `beta3` and the branch `beta3`.
 
@@ -34,8 +37,9 @@ And:
 
 ## Beta 3 - App 0.6.0: BeeMTube2
 
-The main release. The service is not changed (0.5.2: the very package confirmed on a car). Beta 2's picture sizes
-and start screen are in it; neither they nor this version are confirmed on a car yet.
+The main release until Beta 4. The service is not changed (0.5.2: the very package confirmed on a car). Beta 2's
+picture sizes and start screen are in it. **Confirmed on a car since** (a G87 M2): the app under its new name and
+the picture sizes, Fill included.
 
 - **The app is named BeeMTube2**: its tile, its header, its start screen, Settings and Diagnostics. The package ids,
   the repository and the service's name in the Store ("RideTube service") stay, so an installed app updates in place.
@@ -63,7 +67,7 @@ The service is not changed (0.5.2, the stable channel's own package). Not confir
 
 ## Beta 1 (stable): app 0.4.6 and service 0.5.2 play sound and picture on an iDrive 8 car
 
-Confirmed on a G8x (14 photographed pages of Diagnostics, and the picture on its screen). What the car takes, for
+Confirmed on a G87 M2 (14 photographed pages of Diagnostics, and the picture on its screen). What the car takes, for
 reference:
 
 - **The way that plays**: the car's dynamic media player, instance `DynamicMediaPlayerTempMedia`. The instance

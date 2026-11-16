@@ -1,247 +1,176 @@
-# BeeMTube2 (iDrive8-RideTube)
+# BeeMTube2
 
-**BeeMTube2** is an unofficial YouTube client for BMW **iDrive 8** head units (MGU ID8), installed from the MGU Store.
+**YouTube on the BMW iDrive 8 screen.** BeeMTube2 is an unofficial YouTube client for iDrive 8 head units (MGU,
+`ID8`), installed from the [MGU Store](https://github.com/robertnisipeanu/mgu-store). Sound through the car's own
+media player, picture on the curved display, your own Home, Subscriptions and Watch later.
 
-It began as a port of [RideTube by JustAnotherPU](https://github.com/JustAnotherPU/ridetube) (iDrive 7) and is based on
-that work: the app, its service and the way they are built are JustAnotherPU's, GPL-3.0-or-later, and this project
-stays under the same licence. The iDrive 8 version - how it finds the car's sound, its picture sizes, its screens -
-has grown far enough from the original to carry its own name. It is by Waliworld (#tunedbywali). The repository,
-the package ids (`jap_ridetube8`, `jap-ridetube-d`) and the service's name in the Store ("RideTube service") keep
-their names, so a car that has an earlier version updates in place.
+By Waliworld (#tunedbywali). Based on [RideTube by JustAnotherPU](https://github.com/JustAnotherPU/ridetube); see
+[Credits and licence](#credits-and-licence).
 
-> **Sound and picture are confirmed on an iDrive 8 car** (a G8x, Intel MGU21) with Beta 1. iDrive 8 does not offer
-> the media player iDrive 7 plays OAP media with; the service plays through the car's dynamic media player instead,
-> which it found by trying (the changelog has what the car takes). On another car the first play may take a moment
-> to find its way; if you see it playing and hear nothing, press **No sound?** on the player, twice. If nothing
-> plays, **Settings > Diagnostics** has what the car answered.
+> **Unofficial and experimental.** Not affiliated with, endorsed by or sponsored by Google, YouTube or BMW. Use it
+> at your own risk. You are responsible for following YouTube's Terms of Service and the laws of your country, and
+> for using it safely: by default the picture shows only while the car is parked.
+
+| | |
+|---|---|
+| ![Home](docs/media/b2-home.png) | ![The player](docs/media/b2-player.png) |
+| Home: your shelves, dragged sideways with a finger | The player: Previous, 10 s back, pause, 10 s on, Next; quality and picture size |
+| ![Fill](docs/media/b2-player-fill.png) | ![Double tap](docs/media/b2-player-double-tap.png) |
+| Picture size **Fill**: as wide as the screen | Two quick taps on a side: 10 s back or on |
+| ![Search](docs/media/b2-search.png) | ![Keyboard](docs/media/b2-keyboard.png) |
+| Search results, five a row | Its own keyboard, recent searches as buttons |
+| ![Driving](docs/media/b2-driving.png) | ![Settings](docs/media/b2-settings.png) |
+| While driving: the sound plays on, no picture | Settings |
+| ![Start screen](docs/media/b2-start.png) | ![Zoom](docs/media/b2-player-zoom.png) |
+| The start screen | Picture size **Zoom 1** |
+
+The screenshots are rendered on a computer at the car's 2880 x 960 with invented demo data
+(`docs/readme_shots.js`); the pictures in them are drawn stand-ins, not anyone's videos.
+
+## Confirmed on a car
+
+| | |
+|---|---|
+| Car | BMW M2 (G87), iDrive 8 (Intel MGU21 head unit) |
+| Works there | install from the Store, the tile, the screen and touch, search and thumbnails, **sound and picture**, pause, the picture sizes (**zoom and Fill**) |
+| Not reported yet | Beta 4's additions: pages that glide, double tap to seek, Previous / Next, "When a video ends", picture brightness |
+
+One car so far. Reports from other iDrive 8 cars are welcome in the issues, with photos of **Settings >
+Diagnostics** when something does not play.
+
+## Features
+
+**Your YouTube**
+
+- **Home**, **Subscriptions** and **Watch later** once you sign in on the car with the TV device sign-in: a code to
+  enter on your phone. BeeMTube2 never sees your password.
+- **Search** with its own on-screen keyboard; your recent searches are buttons (they work while driving, typing
+  does not).
+- **Channel pages**, **Continue watching** with the place you stopped, video chapters on the progress bar.
+- Signed in, what you watch goes to your YouTube history, as on a TV. Members-only videos can be shown or hidden.
+
+**The player**
+
+- **Picture size**: Fit (the whole picture), Zoom 1, Zoom 2, or **Fill** - as wide as the screen. One button in the
+  player steps through them at once; the sound plays on.
+- **Double tap to seek**: two quick taps on the right third of the picture go 10 s on, on the left third 10 s
+  back; each further tap 10 s more.
+- **Previous** and **Next**, 10 s back and on, play / pause, and a progress bar with the video's chapters.
+- **Video quality**: Auto (720p on Wi-Fi, 480p on phone data), 720p, 480p or 360p, changed from the player.
+- **When a video ends**: play the next of its row, play it again, or stop.
+- **Picture brightness**: 100, 85, 70 or 55 % for a bright video at night.
+- **SponsorBlock**: sponsors, self-promotion, intros and similar are skipped, offered with a Skip button, or left
+  alone - per category ([sponsor.ajay.app](https://sponsor.ajay.app)).
+- **On phone**: a QR code of the video to carry on with it on your phone.
+- **Sound through the car's own media player**, so the car's volume, mute and audio focus behave as for any source.
+
+**In the car**
+
+- **While driving**, the picture gives way to a podcast view (title, progress, controls) and the sound plays on. The
+  picture comes back when the car is parked. (Video while driving is a setting, off by default: only for a car
+  coded for video in motion, and only passengers.)
+- **Made for the screen**: the whole app area of the curved display, five tiles a row, touch throughout.
+- **Smooth**: pages follow a finger and run on when let go; shelves are dragged sideways and settle on a tile.
+- **Easy on the battery**: parked, playback pauses when the 12 V battery falls under 60, 65 or 70 %.
+- **Nothing is kept**: the video playing is downloaded to the head unit while it plays, then deleted. Expect the
+  video's whole size on your data plan, even if you stop early.
+- **Diagnostics** in Settings: what the car answered, page by page - a photo of it is a bug report.
+
+## Install
+
+1. Root SSH on the head unit and the [MGU Store](https://github.com/robertnisipeanu/mgu-store) installed (its
+   README). Back up the head unit's coding before rooting it.
+2. The car online through the Store's uplink (`mgu-uplink`: phone hotspot, USB LTE stick or Wi-Fi).
+3. In the Store: Settings, **Add source**, type `waliworld/iDrive8-RideTube` and pick **Releases**.
+4. Install **BeeMTube2**. The Store installs with it, from this source, its service (`jap-ridetube-d`, listed as
+   "RideTube service") and Node.js 22 (`jap-node22`); from its own source the renderer `mgu-render`, `mgu-python`
+   and the deploy tool.
+5. **Restart the head unit**: on iDrive 8 an app installs at the next start.
+6. Open BeeMTube2 from All apps. Home shows a code: enter it at google.com/device on your phone to sign in (or
+   search without signing in).
+
+**If you see it playing and hear nothing**, press **No sound?** on the player, twice: the service leaves that way
+out and tries the next. **If nothing plays**, photograph every page of **Settings > Diagnostics**. Settings'
+**Sound: start over** makes the service find the car's sound again from the start.
+
+For iDrive 7, use the original [RideTube](https://github.com/JustAnotherPU/ridetube).
 
 ## Versions, and going back
 
 | Version | What it is | In the MGU Store: Add source | Branch |
 |---|---|---|---|
-| **Beta 4** (the main release) | BeeMTube2: app 0.7.0 - pages that glide under a finger, shelves dragged sideways, double tap to seek, Previous / Next, what to do when a video ends, picture brightness, the logo on the start screen. Service 0.5.2, unchanged | `waliworld/iDrive8-RideTube`, **Releases** | `main`, `beta4` |
-| Beta 3 | BeeMTube2: app 0.6.0 - the new name, picture size (zoom), the start screen. Service 0.5.2 | the address `https://github.com/waliworld/iDrive8-RideTube/releases/download/beta3/catalog.json` | `beta3` |
-| Beta 2 | app 0.5.0 (still named RideTube): picture size, the start screen. Service 0.5.2 | the address `https://github.com/waliworld/iDrive8-RideTube/releases/download/beta2/catalog.json` | `beta2` |
-| Beta 1 (stable) | app 0.4.6, service 0.5.2: the first version confirmed on a car | the address `https://github.com/waliworld/iDrive8-RideTube/releases/download/stable-1/catalog.json` | `beta1-stable` |
+| **Beta 4** (the main release) | app 0.7.0: gliding pages and shelves, double tap to seek, Previous / Next, when a video ends, picture brightness, the logo on the start screen | `waliworld/iDrive8-RideTube`, **Releases** | `main`, `beta4` |
+| Beta 3 | app 0.6.0: the name BeeMTube2, picture size (zoom), the start screen | the address `https://github.com/waliworld/iDrive8-RideTube/releases/download/beta3/catalog.json` | `beta3` |
+| Beta 2 | app 0.5.0 (still named RideTube): picture size, the start screen | the address `https://github.com/waliworld/iDrive8-RideTube/releases/download/beta2/catalog.json` | `beta2` |
+| Beta 1 (stable) | app 0.4.6: the first version with sound and picture on a car | the address `https://github.com/waliworld/iDrive8-RideTube/releases/download/stable-1/catalog.json` | `beta1-stable` |
 
 All of them run the **same service package** (0.5.2, the one confirmed on a car); only the app differs. **To go
 back** on a car: add the older version's address as a source (easiest from the Store's phone page), uninstall the
 app (the service can stay), install it again from that source, restart the head unit. The releases `stable-1`,
-`beta2` and `beta3` and the branches `beta1-stable`, `beta2` and `beta3` are kept as they are for that.
-
-## Install on an iDrive 8 car
-
-1. Root SSH on the head unit and the [MGU Store](https://github.com/robertnisipeanu/mgu-store) installed (its README).
-   Back up the head unit's coding before rooting it.
-2. The car online through the Store's uplink (`mgu-uplink`: phone hotspot, USB LTE stick or Wi-Fi).
-3. In the Store: Settings, **Add source**, type `waliworld/iDrive8-RideTube` and pick **Releases**.
-4. Install **BeeMTube2**. The Store installs with it, from this source, its service `jap-ridetube-d` and Node.js 22
-   (`jap-node22`); from its own source the renderer `mgu-render`, `mgu-python` and the deploy tool.
-5. **Restart the head unit**: on iDrive 8 an app installs at the next start.
-6. Open BeeMTube2 from All apps. Home shows a code: enter it at google.com/device on your phone to sign in
-   (or search without signing in).
-
-Uninstall: in BeeMTube2's Settings (left rail), Sign out; then uninstall BeeMTube2 and its service ("RideTube service") in the Store.
-
-## Releasing (maintainers)
-
-```sh
-MGU_STORE=<a clone of github.com/robertnisipeanu/mgu-store> tools/release_id8.sh   # -> dist/release/
-```
-
-Upload every file of `dist/release/` to the GitHub release tagged `catalog` (the Store reads its `catalog.json`).
-The Release workflow does this by itself on a push to `main`: it builds, takes every component whose version
-did not change from the kept release `stable-1` as it is (`tools/channel.py pin`: the service a car runs stays the
-very package that was confirmed), and publishes the rest with the new `catalog.json`.
-The script builds the app and packs the service and Node.js 22 from this repository; the prebuilt binaries (the video
-decoder `ytdec`, yt-dlp 2026.10.26 and the Node.js 22 build) are taken from JustAnotherPU's published releases and
-checked against sha256 sums pinned in the script.
-
-## Licence
-
-GPL-3.0-or-later, as RideTube ([LICENSE](LICENSE), copyright JustAnotherPU and contributors). The app kit (`kit/`) and
-the Node.js 22 tool (`tools/jap-node22/`) are MIT ([kit/LICENSE](kit/LICENSE),
-[tools/jap-node22/LICENSE.mgu-apps](tools/jap-node22/LICENSE.mgu-apps)); third-party parts as in
-[THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES).
-
----
-
-# RideTube
-
-> **Experimental and unofficial.** RideTube is an unofficial client for YouTube. It is not affiliated with,
-> endorsed by or sponsored by Google or YouTube. Use it at your own risk. You are responsible for following
-> YouTube's Terms of Service and the laws of your country, and for using it safely: by default the picture
-> shows only while the car is parked.
-
-| | |
-|---|---|
-| ![Home](docs/media/home.png) | ![Player](docs/media/player.png) |
-| Home: your shelves, Continue watching first | The player, with chapters on the progress bar |
-| ![Podcast mode while driving](docs/media/driving.png) | ![Sign in](docs/media/signin.png) |
-| While driving: the sound plays on, no picture | Sign in with a code on your phone |
-
-Rendered on a computer with demo data (Blender open movie titles), not photographed in a car.
-
-RideTube plays videos on the BMW iDrive 7 and iDrive 8 head units (MGU), installed from the MGU Store. Everything
-runs on the car, over the car's own internet connection:
-
-- **Home**, **Subscriptions** and **Watch later**, once you sign in on the car with the TV device sign-in (a
-  code to enter on your phone; RideTube never sees your password).
-- Search, channel pages, chapters, the video quality and fill or fit for the picture.
-- Skip segments from [SponsorBlock](https://sponsor.ajay.app) (sponsors, self-promotion, intros and similar).
-- The sound plays through the car's own media player.
-- While driving, the picture is replaced by a podcast view (title, progress, controls) and the sound plays on.
-  The picture comes back when the car is parked again.
-- Nothing is stored for later. The video playing is downloaded to the head unit in full while it plays, then
-  deleted: expect the video's whole size on your data plan, even if you stop early. The download stops if the
-  head unit's storage gets low.
-- Signed in, what you watch goes to your YouTube history, as on a TV.
-
-## Requirements
-
-- A BMW with iDrive 7 (MGU, `ID7`) or iDrive 8 (`ID8`, see "iDrive 8" below) and the
-  [MGU Store](https://github.com/robertnisipeanu/mgu-store) installed.
-- The car online through the Store's uplink (`mgu-uplink`).
-- Installed for you as requirements, so keep their sources in the Store: from the Store's own source, the
-  renderer `mgu-render` 0.6.11 or newer, `mgu-deploy` 0.7.0 and `mgu-python` 1.0.2; on iDrive 7, from the Store's
-  default `cauliflowermossgrape/idrive7-apps` source, the controller gate `mgu-inputgate` 1.0.0.
-
-## Install
-
-In the MGU Store, add the source
-
-```
-JustAnotherPU/ridetube:releases
-```
-
-Add `JustAnotherPU/mgu-apps:releases` too (it is a default source once accepted): it has `jap-node22`, the
-Node.js 22 that RideTube's service runs on (yt-dlp needs it). Without that source the install stops with
-"needs jap-node22". Then install RideTube: the Store lists the one for your head unit, **RideTube** (`jap_ridetube`,
-iDrive 7) or **RideTube** (`jap_ridetube8`, iDrive 8), and installs its service (`jap-ridetube-d`, the player, the
-yt-dlp fetcher and the video decoder) and, from mgu-apps, `jap-node22` with it. On iDrive 8, apps install at the
-next head-unit restart.
-
-## iDrive 8
-
-Beta: built and tested on a computer against iDrive 8's screen (2880 x 960); on a car the app, its screen, touch,
-search and thumbnails work (0.4.4), **the sound and the picture of a video are not confirmed yet**. Reports welcome
-in the issues.
-
-- Its own app, `jap_ridetube8`, from the same code: the HMI has a page of the app's (status lines only) and the GPU
-  renderer draws the whole screen over the app area (under the HMI's status strip, over the climate bar). Five tiles
-  a row.
-- **A source package.** On iDrive 8 the MGU Store's deploy tool gives BMW's oap-sdk only to source packages
-  (`mgu-app.json`): it links the modules they list against the SDK of an app already on the car, as it builds the
-  Store's own app. (On iDrive 7 it also generates `node_modules/oap-sdk` for an ordinary package; on iDrive 8 such a
-  package installs, shows its tile and never starts.) `build.py --hmi ID8` writes `dist/src/jap_ridetube8@<v>.tgz`:
-  `mgu-app.json`, one linked module (`kit/id8/boot.js`: the start, the tile, the shutdown) and the package tree with
-  the kit and the app as plain files (`app/`). The linked module gives them the SDK through `kit/sdk.js`, not a
-  global: on the car the bundle's `global` is its own.
-- **The renderer.** The kit connects to mgu-render as the iDrive 8 apps known to draw on a car do (IterioDev's
-  dialect: a layer over the app area, touch claims, pictures, videos), not with mgu-render/1, whose foreground gate
-  is unconfirmed on iDrive 8.
-- Touch only (no controller gate on iDrive 8). The header's back arrow closes RideTube (a sheet over the page first).
-- Search opens RideTube's own keyboard, with your recent searches as buttons. Typing works only while parked; the
-  recent searches work while driving.
-- The rail's **Settings** has the account (Sign in, Sign out pressed twice), **Diagnostics** and the settings.
-- **The sound** is found on the car (service 0.5.0, `native/jap-ridetube-d/sound.js`). The first play tries the
-  quick ways first: the service's own player (`ytaud` decodes, `ytalsa.py` writes to the audio router's ALSA
-  devices) on the device the car takes samples from once the audio manager has connected our source, then once a
-  dynamic media player instance has given its audio focus - which device that is, is measured by writing silence to
-  the free ones. Then the long way: the dynamic player's playlist in each of its entertainment instances - the item
-  as BMW's own SDK writes it, read from an app installed on the car (`sdkread.js`: in a child without privileges,
-  the app never runs), then other forms, places for the file and starts. The way that plays is kept in
-  `/var/opt/jap-ridetube-d/state/sound.json`; the player's **No sound?** (pressed twice) leaves a way out that
-  plays unheard, Settings' **Sound: start over** forgets all of it. Every answer of the car is on the first pages of
-  Diagnostics and in `/var/opt/jap-ridetube-d/log/sound.log`.
-- The video is decoded as a 16:9 frame as tall as the app area (1358 x 764).
-- Needs `jap-node22` with iDrive 8 in its catalog: this repository's release has it (JustAnotherPU/mgu-apps lists it
-  for iDrive 7 only, so its source alone stops the install with "needs jap-node22").
-
-What may need a fix on the car, and how to tell (`journalctl -u jap-ridetube-d`, the app's
-`/var/opt/public/oap/oap_<uid>/data/jap_ridetube8.log`):
-
-- **Getting a unit's facts onto a computer** (for a head unit RideTube does not play on yet). `tools/id8_collect.js`
-  runs on the head unit, read only, over the SSH you installed the Store with:
-  `<your ssh command for the car> node < tools/id8_collect.js > ridetube-id8-data.txt` (cmd.exe, bash, zsh; in
-  PowerShell wrap it in `cmd /c "..."`). It takes the interface descriptions, the app manager's and up to four
-  apps' media code, the Store's status and RideTube's logs; never the account files or other apps' data (the list
-  is at the top of the script). `node tools/id8_unpack.js ridetube-id8-data.txt <folder>` turns it into files. What
-  it takes from the unit is BMW's: keep it private.
-- **The sound.** The service plays through BMW's media player as on iDrive 7 (the audio manager's CommandControl,
-  the MediaPlayer instance `OapGenericMedia`, source 1046, sink 1024), and looks further where an iDrive 8 keeps
-  them elsewhere (`native/jap-ridetube-d/README.md`). If a video ends with "Error: the car's audio is not ready
-  ..." or does not sound, open **Settings > Diagnostics** and photograph every page (Next): they say where the
-  start stopped, what the car has and what it answered. A route known to be right goes in
-  `/var/opt/jap-ridetube-d/state/audio.json`, then restart the service.
-- **The picture.** ytdec decodes on the Intel GPU with the head unit's Media SDK (`libmfxhw64`). The service logs at
-  start whether the head unit has it. Without it the sound plays and the picture shows "video failed, audio only".
-- **The tile.** The entry module makes the tile usable as the MGU Store's app does on iDrive 8 (the name and icon
-  stay the manager's). If the tile greys out or does nothing, the app's log has its lines (`boot: ...`): whether the
-  SDK started, the start reason, the tile's steps, the page. No `boot:` line at all means the app's process did not
-  get as far as its first line. If the install itself is refused, the Store says why (the head unit could not build
-  the package).
-- **A grey page.** The HMI's own page under RideTube's screen has four status lines and says the reason in its
-  title: the version, how the app was started, the tile, the page and whether the app's code loaded
-  (`start: ... | tile: ... | page: ... | app: ...`), the screen (`visible`, `focus`, `stack`), the renderer
-  (`connected`, the dialect, `touch`, `asked`, `claims`, `frames`, `ticks`) and the service. RideTube's screen covers them while it draws, so
-  a page you can read them on is one the picture did not reach: a photo of it is the report. A page with only
-  `Starting...` means the app's process did not run. The app's log has the first events the HMI sent
-  (`hmi: visible ...`, `hmi: focus ...`, `hmi: stack ...`).
+`beta2` and `beta3` and their branches are kept as they are for that. [CHANGELOG.md](CHANGELOG.md) has every
+version.
 
 ## Settings
 
+- **Picture size**: Fit, Zoom 1, Zoom 2, Fill (also the Zoom button of the player).
+- **Picture brightness**: 100, 85, 70 or 55 %.
+- **Video quality**: Auto, 720p, 480p or 360p.
+- **When a video ends**: play the next of its row, play it again, or stop.
 - **Video while driving**: off by default. Leave it off unless the car is coded for video in motion and only
-  passengers can see the screen. You use it at your own risk. It takes effect only once switched on while the
-  car is parked: pressed while driving, the picture stays off until the next stop.
-- **Fill the screen**: off by default (black bars); on, the picture is cropped to fill the screen.
-- **Video quality**: auto (720p on Wi-Fi, 480p on phone data), 720p, 480p or 360p.
+  passengers can see the screen. It takes effect only once switched on while the car is parked.
 - **Show members-only videos**: off by default. A channel can also be hidden from its page.
 - **SponsorBlock**, per category: skip, show a Skip button, or off.
 - **Parked: pause when the 12 V battery is under** 60, 65 (default) or 70 %, or never.
-- **Sign in** / **Sign out** in the app's menu.
+- **Sign in** / **Sign out** (pressed twice), **Diagnostics** and **Sound: start over** on the Settings card.
 
 The parked check reads the car's speed. A reading older than 5 seconds counts as driving.
 
-## Tested on
+## Good to know
 
-| | |
-|---|---|
-| Car | BMW X5 xDrive45e (G05), iDrive 7 (MGU, ID7 HMI), firmware P18_23w44.2-1-3 |
-| iDrive 8 | not yet on a car: the computer tests (`kit/tools/test_ridetube8.js`) only |
-| Internet | the Store's uplink over home Wi-Fi and an iPhone hotspot |
-
-One car only so far. Reports from other cars are welcome in the issues.
-
-## Known limits
-
-- yt-dlp breaks now and then when YouTube changes. A fixed RideTube release then needs a new yt-dlp (see
-  `native/jap-ridetube-d/README.md`, "Updating yt-dlp").
-- H.264 only (up to 720p, 30 fps preferred), decoded on the head unit's GPU. A video with no H.264 stream
-  does not play.
-- Signing in uses the TV device sign-in that YouTube's TV apps use. The client id is read from YouTube's TV
-  page when you sign in; RideTube ships none.
+- yt-dlp breaks now and then when YouTube changes; a fixed release then needs a new yt-dlp
+  (`native/jap-ridetube-d/README.md`, "Updating yt-dlp").
+- H.264 only (up to 720p, 30 fps preferred), decoded on the head unit's GPU. A video with no H.264 stream does not
+  play.
+- **Fill** cuts the top and bottom of a 16:9 picture: the screen is far wider than a video. The picture cannot cover
+  BMW's own status strip or climate bar.
+- The first play on a car new to BeeMTube2 may take a moment: the service finds which of the car's players sounds.
 - The switch from the first seconds of sound to the full file may be heard as a short break.
-- Any app installed on the head unit can drive RideTube's service through its control socket (it is open to the
-  group every app shares). Install only apps you trust; see `native/jap-ridetube-d/README.md`, "Security notes".
+- Signing in uses the TV device sign-in that YouTube's TV apps use. The client id is read from YouTube's TV page
+  when you sign in; BeeMTube2 ships none.
+- Any app installed on the head unit can drive the service through its control socket (it is open to the group
+  every app shares). Install only apps you trust; see `native/jap-ridetube-d/README.md`, "Security notes".
 
 ## Uninstall
 
-1. In RideTube, **Sign out** (or later, remove "YouTube on TV" at https://myaccount.google.com/permissions):
-   uninstalling deletes the sign-in from the car, but Google keeps the grant until it is revoked.
-2. In the MGU Store, uninstall **RideTube**, then its service `jap-ridetube-d`. A bad update can be undone in the
-   Store while the previous version is kept.
+1. In BeeMTube2's Settings, **Sign out** (or later, remove "YouTube on TV" at
+   https://myaccount.google.com/permissions): uninstalling deletes the sign-in from the car, but Google keeps the
+   grant until it is revoked.
+2. In the MGU Store, uninstall **BeeMTube2**, then its service ("RideTube service", `jap-ridetube-d`).
+
+## How it works on iDrive 8
+
+- **The app** (`jap_ridetube8`) is a source package the Store's deploy tool builds on the head unit against BMW's
+  own SDK. The HMI gives it a page; the GPU renderer `mgu-render` draws the whole app area over it (2880 x 764,
+  under the status strip, over the climate bar) and routes touch.
+- **The service** (`jap-ridetube-d`) fetches with yt-dlp on Node.js 22, decodes the picture on the Intel GPU
+  (`ytdec`, the head unit's Media SDK) into the renderer's video layer, and plays the sound through the car.
+- **The sound.** iDrive 8 does not offer the media player iDrive 7 plays app media with. The service plays through
+  the car's dynamic media player instead, which it found by trying: it asks for the audio focus as BMW's own apps
+  do, hands the file over as an item made the way BMW's code makes one, and starts it. The way that plays is kept;
+  [CHANGELOG.md](CHANGELOG.md) (Beta 1) has what the car takes, and `native/jap-ridetube-d/README.md` the detail.
+- **The picture's size** is the renderer's: the same decoded 16:9 frame is drawn larger around the centre and cut
+  at the app area's edges, so a step takes effect at once.
 
 ## Layout
 
 | Path | |
 |---|---|
-| `apps/jap_ridetube` | the app (Node 8, the iDrive's own app runtime), for iDrive 7 and, built with `--hmi ID8`, iDrive 8 |
-| `kit/` | the idrive7-apps app kit, trimmed to the modules RideTube uses, with an iDrive 8 profile (`display.js`, `keyboard.js`) |
-| `native/jap-ridetube-d` | the service on the car: player, fetcher, account, search, thumbnails |
-| `native/ytdec` | the H.264 decoder that draws into the renderer's video layer |
-| `native/ytaud` | the AAC decoder (FAAD2, static) of the service's own player, for a head unit without a player for us |
-| `tools/release.py` | lays out the Store catalog (`catalog.json` and its assets) |
+| `apps/jap_ridetube` | the app (Node 8, the iDrive's own app runtime), built for iDrive 8 with `--hmi ID8` |
+| `kit/` | the app kit: the screen, touch, sheets, the keyboard, the renderer's protocol |
+| `native/jap-ridetube-d` | the service on the car: player, fetcher, account, search, thumbnails, the search for the car's sound |
+| `native/ytaud` | the AAC decoder of the service's own player |
+| `tools/` | the release: `release_id8.sh`, the catalog (`release.py`), the kept versions (`channel.py`) |
+| `docs/` | the front page's screenshots and what makes them (`readme_shots.js`, `readme_shots.py`) |
 
 ## Build and test on a computer
 
@@ -269,8 +198,30 @@ python3 tools/release.py      # dist/release/: upload every file to a GitHub rel
 
 The tests need Node 18 or newer, Python 3.12 and ffmpeg.
 
-## License
+## Releasing (maintainers)
 
-GPL-3.0-or-later, Copyright (c) 2026 JustAnotherPU ([LICENSE](LICENSE)). Parts come from others under their
-own licences (the app kit: MIT; parts of `native/ytdec`: GPL-3.0-or-later; yt-dlp: Unlicense, fetched at
-build time; SponsorBlock data: CC BY-NC-SA 4.0): see [THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES).
+```sh
+MGU_STORE=<a clone of github.com/robertnisipeanu/mgu-store> tools/release_id8.sh   # -> dist/release/
+```
+
+The Release workflow runs it on a push to `main`: it builds, takes every component whose version did not change from
+the kept release `stable-1` as it is (`tools/channel.py pin`: the service a car runs stays the very package that
+was confirmed), and publishes the rest with the new `catalog.json` to the release tagged `catalog`, which the Store
+reads. The prebuilt binaries (the video decoder `ytdec`, yt-dlp and the Node.js 22 build) are taken from
+JustAnotherPU's published releases and checked against sha256 sums pinned in the script. The screenshots:
+`python3 kit/tools/build.py --hmi ID8 jap_ridetube && node docs/readme_shots.js <folder> && python3
+docs/readme_shots.py <folder>`.
+
+## Credits and licence
+
+BeeMTube2 began as a port of **[RideTube](https://github.com/JustAnotherPU/ridetube) by JustAnotherPU** (iDrive 7)
+and is built on that work: the app, its service and the way they are built are JustAnotherPU's. The iDrive 8
+version - how it finds the car's sound, its picture sizes, its motion, its screens - has grown far enough from the
+original to carry its own name. The repository, the package ids (`jap_ridetube8`, `jap-ridetube-d`) and the
+service's name in the Store keep theirs, so a car that has an earlier version updates in place.
+
+GPL-3.0-or-later, as RideTube ([LICENSE](LICENSE), copyright JustAnotherPU and contributors). The app kit (`kit/`)
+and the Node.js 22 tool (`tools/jap-node22/`) are MIT ([kit/LICENSE](kit/LICENSE),
+[tools/jap-node22/LICENSE.mgu-apps](tools/jap-node22/LICENSE.mgu-apps)); third-party parts (yt-dlp, SponsorBlock
+data, FAAD2 and others) as in [THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES). Thanks to robertnisipeanu for the MGU
+Store and its renderer.
