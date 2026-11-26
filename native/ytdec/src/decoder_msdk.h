@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Robert Nisipeanu
-// Modified 2026-11 by JustAnotherPU for RideTube (GPL-3.0 section 5(a)): frames in display order with their timestamps, VPP fit/fill into the output size, NV12 planes out.
+// Modified 2026-11 by JustAnotherPU for RideTube (GPL-3.0 section 5(a)): frames in display order with their timestamps, VPP fit/fill into the output size (or the picture alone at most at source size), NV12 planes out, VP9 through the unit's MSDK VP9 plugin.
 // From github.com/robertnisipeanu/idrive-apps, native/waze-on-cluster/src/decoder_msdk.h.
 /* Hardware H.264 decoder: Annex-B byte stream in, NV12 frames out.
  *
@@ -56,7 +56,8 @@
  * DecodedOrder as the software library does, whether the phone's stream has
  * B frames, and throughput. The decoder has never run on the GPU. Frames
  * without a picture (decode synced alone, no VPP) are checked against
- * neither library. */
+ * neither library. VP9 (use_vp9) is checked against neither: the unit's
+ * libmfxsw64 has no VP9 and there is no software VP9 plugin. */
 #ifndef WOC_DECODER_MSDK_H
 #define WOC_DECODER_MSDK_H
 
@@ -70,7 +71,7 @@
 namespace woc {
 
 struct VideoFrame {
-    uint32_t w, h;        /* the output size (letterbox bars included) */
+    uint32_t w, h;        /* the output size (letterbox bars included; no_upscale: none) */
     uint16_t corrupted;   /* MSDK's mfxFrameData::Corrupted flags; 0: decoded whole */
     int64_t pts_ms;       /* the timestamp fed with this frame's access unit; -1 unknown */
     /* NV12 planes, the decoder's buffer, valid until the next
@@ -91,8 +92,10 @@ public:
 
     /* dev: the render node, "/dev/dri/renderD128". out_w/out_h: output size,
      * even, or both 0 for the stream's own size. fill: crop the picture to
-     * fill out_w x out_h; otherwise fit it inside, black bars around. */
-    bool init(const char *dev, uint32_t out_w, uint32_t out_h, bool fill, std::string *err);
+     * fill out_w x out_h; otherwise fit it inside, black bars around.
+     * no_upscale: frames are the picture alone (no bars), at most the
+     * source's resolution, so their size follows the stream (fit.h). */
+    bool init(const char *dev, uint32_t out_w, uint32_t out_h, bool fill, bool no_upscale, std::string *err);
 
     /* Feeds Annex-B bytes, split anywhere; cb gets each decoded frame.
      * end_of_au: the bytes end exactly at the end of an access unit (one
@@ -112,6 +115,14 @@ public:
     /* Initialised and holding a sequence: false before the first SPS and
      * after a sequence was given up, until the next SPS. */
     bool decoding() const;
+
+    /* VP9 instead of H.264, from now on: loads the unit's VP9 plugin
+     * (/usr/lib/mediasdk/libmfx_vp9d_hw64.so) and registers it in every
+     * session, as the MSDK dispatcher's MFXVideoUSER_Load does. Then each
+     * feed() is one whole VP9 frame (a superframe whole) with end_of_au, a
+     * keyframe starts a sequence (the SPS's role), no NAL framing. False,
+     * with *err, when the plugin does not load or register. */
+    bool use_vp9(std::string *err);
 
 private:
     struct State;

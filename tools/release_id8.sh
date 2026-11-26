@@ -2,7 +2,7 @@
 # Builds this repository's MGU Store release in dist/release/ (catalog.json and its assets), for the GitHub release
 # tagged "catalog" of waliworld/iDrive8-RideTube:
 #   jap_ridetube8    RideTube for iDrive 8, as a source package the head unit builds (kit/tools/build.py --hmi ID8)
-#   jap-ridetube-d   its service (packed here; ytdec and ytdlp.pyz as in JustAnotherPU's release 0.3.9, checked below;
+#   jap-ridetube-d   its service (packed here; ytdec and ytdlp.pyz as in JustAnotherPU's release 0.5.7, checked below;
 #                    ytaud - native/ytaud and FAAD2 - as in this repository's kept release stable-1, checked below)
 #   jap-node22       Node.js 22 for the service (packed here from tools/jap-node22; the binary as in JustAnotherPU/mgu-apps)
 # Usage: MGU_STORE=<a clone of github.com/robertnisipeanu/mgu-store> tools/release_id8.sh
@@ -24,14 +24,22 @@ take() {     # tgz member sha256 out
     tar -xzf "$1" -O "$2" > "$4"
     [ "$(sha "$4")" = "$3" ] || { echo "release_id8.sh: $2 in $1 is not the pinned one" >&2; exit 1; }
 }
-fetch "$UP/ridetube/releases/download/catalog/jap-ridetube-d@0.3.9.tgz" 63dc4d7deb18849662d7d90efb41017483db5f835e6124fb90e6f5cd45300f5d "$dl/jap-ridetube-d@0.3.9.tgz"
+# The decoder and yt-dlp of upstream's service 0.5.7 (its ytdec plays a stream's window and VP9; native/ytdec here
+# is that source). Upstream's release keeps only its newest package, so once that one is gone the two files are taken
+# from this repository's own release beta6 (the same files: each is checked by its sha256 below, not the package).
+upsvc="$dl/upstream-service.tgz"
+if [ ! -f "$upsvc" ] || ! tar -tzf "$upsvc" files/ytdec >/dev/null 2>&1; then
+    curl -fsSL --retry 3 -o "$upsvc.part" "$UP/ridetube/releases/download/catalog/jap-ridetube-d@0.5.7.tgz" \
+        || curl -fsSL --retry 3 -o "$upsvc.part" "https://github.com/waliworld/iDrive8-RideTube/releases/download/beta6/jap-ridetube-d@8.0.0.tgz"
+    mv "$upsvc.part" "$upsvc"
+fi
 fetch "$UP/mgu-apps/releases/download/catalog/jap-node22@22.23.4.tgz" c62a8e2a3803b858b4d1020cb19746c8bd9ae8b753145f80c5adf7d781692743 "$dl/jap-node22@22.23.4.tgz"
 
-# the service: this repository's files, the decoder and yt-dlp (2026.10.26) as released upstream
+# the service: this repository's files, the decoder and yt-dlp as released upstream
 d=$root/native/jap-ridetube-d
 mkdir -p "$d/build"
-take "$dl/jap-ridetube-d@0.3.9.tgz" files/ytdec 15a9c75d2a19e3cafda3f5a8d0f7eb706a12c90ca90f5b60f1253d25749dd2eb "$d/build/ytdec"
-take "$dl/jap-ridetube-d@0.3.9.tgz" files/ytdlp.pyz 9e4e1be29d4f2cfef2ed34f63445be6c8d26d7e3452559eaf7b0cf62b65cbddc "$d/build/ytdlp.pyz"
+take "$upsvc" files/ytdec 8c42bc7cd6f9b99f3523014bfcb7d50e387c3dc04ec440897a545784daee20c1 "$d/build/ytdec"
+take "$upsvc" files/ytdlp.pyz 421315a930d6166ee8f4fb582d0e2d1d20281309f2ef162b6a79c7de0995c88b "$d/build/ytdlp.pyz"
 chmod 755 "$d/build/ytdec"
 # Node.js 22 (unofficial-builds linux-x64-glibc-217, loader /lib/ld-linux-x86-64.so.2) and its licence
 n=$root/tools/jap-node22
@@ -66,7 +74,7 @@ fetch "https://github.com/waliworld/iDrive8-RideTube/releases/download/stable-1/
 take "$dl/jap-ridetube-d@0.5.2.tgz" files/ytaud 26342ae67f8ce437ac6e1d403fa37711a7c12584b960588f32a48c27093b4440 "$d/build/ytaud"
 chmod 755 "$d/build/ytaud"
 python3 -I "$root/native/ytaud/test_ytaud.py" "$d/build/ytaud" >/dev/null || { echo "release_id8.sh: native/ytaud/test_ytaud.py did not pass" >&2; exit 1; }
-(cd "$d" && node test/test_ytd.js >/dev/null && node test/test_sdkread.js >/dev/null && node test/test_sound.js >/dev/null && node test/test_thumb.js >/dev/null)
+(cd "$d" && node test/test_ytd.js >/dev/null && node test/test_sdkread.js >/dev/null && node test/test_sound.js >/dev/null && node test/test_thumb.js >/dev/null && node test/test_proxy.js >/dev/null)
 python3 -I "$d/test/test_ytalsa.py" >/dev/null || { echo "release_id8.sh: test_ytalsa.py did not pass" >&2; exit 1; }
 node tools/test_id8_collect.js >/dev/null
 

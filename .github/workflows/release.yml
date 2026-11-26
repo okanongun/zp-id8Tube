@@ -6,16 +6,19 @@
 # "beta3" (Beta 3) and "beta4" (Beta 4, copied from the main release by the run that first replaces it), the
 # branches beta1-stable, beta2, beta3 and beta4.
 # Runs when main changes in what goes into the release, or by hand (Actions, Run workflow).
+# The branch beta6 (upstream's playback upgrades brought in; not confirmed on a car) publishes the same way to a
+# release of its own, "beta6": a separate address, so the main release stays Beta 5 until Beta 6 is confirmed.
 name: Release (MGU Store catalog)
 
 on:
   push:
-    branches: [main]
+    branches: [main, beta6]
     paths:
       - 'apps/**'
       - 'kit/**'
       - 'native/jap-ridetube-d/**'
       - 'native/ytaud/**'
+      - 'native/ytdec/**'
       - 'tools/**'
       - '.github/workflows/release.yml'
   workflow_dispatch:
@@ -24,10 +27,12 @@ permissions:
   contents: write
 
 concurrency:
-  group: catalog-release
+  group: catalog-release-${{ github.ref_name }}
   cancel-in-progress: false
 
 env:
+  # the release this run publishes to: main is the Store's main release, any other branch a release named as it
+  CHANNEL: ${{ github.ref_name == 'main' && 'catalog' || github.ref_name }}
   KEPT_CATALOG: https://github.com/waliworld/iDrive8-RideTube/releases/download/stable-1/catalog.json
 
 jobs:
@@ -41,6 +46,7 @@ jobs:
           node-version: '22'
 
       - name: Keep Beta 4 as the release "beta4" before it is replaced (once)
+        if: github.ref_name == 'main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -65,12 +71,28 @@ jobs:
         run: git clone --depth 1 https://github.com/robertnisipeanu/mgu-store "$RUNNER_TEMP/mgu-store"
 
       - name: Build the release (dist/release/)
-        run: MGU_STORE="$RUNNER_TEMP/mgu-store" RELEASE_TAG=catalog tools/release_id8.sh
+        run: MGU_STORE="$RUNNER_TEMP/mgu-store" RELEASE_TAG="$CHANNEL" tools/release_id8.sh
 
       - name: What did not change since stable-1 is its own package
         run: python3 tools/channel.py pin dist/release "$KEPT_CATALOG"
 
+      - name: Publish a branch's build as a release of its own (beta6)
+        if: github.ref_name != 'main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="BeeMTube2 for iDrive 8 - Beta 6 (to try: upstream's playback upgrades; not the main release)"
+          notes="Beta 6, for trying on a car before it becomes the main release: streaming playback, VP9, resume and the rest of upstream RideTube's service up to its 0.5.8, with BeeMTube2's iDrive 8 sound kept as it is. To try it, add this address as a source in the MGU Store: https://github.com/waliworld/iDrive8-RideTube/releases/download/$CHANNEL/catalog.json - then update BeeMTube2 and the RideTube service and restart the head unit. To go back: uninstall both and install them again from the main source."
+          if gh release view "$CHANNEL" >/dev/null 2>&1; then
+            gh release edit "$CHANNEL" --title "$title" --notes "$notes" --latest=false
+          else
+            gh release create "$CHANNEL" --target "$GITHUB_SHA" --title "$title" --notes "$notes" --latest=false
+          fi
+          gh release upload "$CHANNEL" dist/release/* --clobber
+          echo "published to $CHANNEL:"; ls -l dist/release
+
       - name: Publish it as the release "catalog"
+        if: github.ref_name == 'main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

@@ -102,6 +102,7 @@ For iDrive 7, use the original [RideTube](https://github.com/JustAnotherPU/ridet
 
 | Version | What it is | In the MGU Store: Add source | Branch |
 |---|---|---|---|
+| Beta 6 (**to try**, not confirmed on a car) | app 0.8.0 and service 8.0.0: upstream RideTube's playback upgrades - streaming, VP9, resume - with the iDrive 8 sound kept | the address `https://github.com/waliworld/iDrive8-RideTube/releases/download/beta6/catalog.json` | `beta6` |
 | **Beta 5** (the main release) | app 0.7.1 and **service 0.5.3**: sound on cars where BMW's player code cannot be read (a G80 M3) - every car is first asked the way the M2 plays | `waliworld/iDrive8-RideTube`, **Releases** | `main`, `beta5` |
 | Beta 4 | app 0.7.0: gliding pages and shelves, double tap to seek, Previous / Next, when a video ends, picture brightness, the logo on the start screen | the address `https://github.com/waliworld/iDrive8-RideTube/releases/download/beta4/catalog.json` | `beta4` |
 | Beta 3 | app 0.6.0: the name BeeMTube2, picture size (zoom), the start screen | the address `https://github.com/waliworld/iDrive8-RideTube/releases/download/beta3/catalog.json` | `beta3` |

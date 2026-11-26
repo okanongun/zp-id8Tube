@@ -1,5 +1,42 @@
 # Changelog
 
+## Beta 6 (to try) - Service 8.0.0, app 0.8.0: upstream's playback upgrades, the iDrive 8 sound kept
+
+**Not the main release.** Published on its own address, the release `beta6`, so nothing changes on a car until
+its source is added there: `https://github.com/waliworld/iDrive8-RideTube/releases/download/beta6/catalog.json`.
+The main release stays Beta 5 (confirmed on a G87 M2 and a G80 M3). Not tried on a car.
+
+Upstream RideTube (JustAnotherPU/ridetube) went from the service 0.3.9 this fork left it at to 0.5.8. Its service
+is merged in here (`git merge`, upstream at `199dbf8`); the app and the kit stay BeeMTube2's.
+
+- **What the service now does by itself** (no change in the app needed): a video **streams** - it plays while a
+  small window of it is fetched, in RAM where the unit has the tmpfs the service mounts (256 MB cap), instead of
+  being fetched whole first; **VP9** where the unit's decoder plugin loads (H.264 again where it does not);
+  **resume** at the furthest of the car's place and YouTube's; the place kept when the sound restarts mid-video; a
+  fetcher that died is started again where it was; yt-dlp **updates itself** on the car; the MGU Store's proxy is
+  used when one is set there; the decoder's session closes while paused (less processor).
+- **Kept as BeeMTube2 has it** (the code confirmed on the two cars): the whole `Audio` class (how the car's audio
+  is found and asked on iDrive 8), `sound.js`, `sdkread.js`, the wait for the head unit's start, "No sound?",
+  Diagnostics. Where upstream's new flow starts, restarts or switches the sound, the iDrive 8 path is the one it
+  was: asked once (no second try on top of the search), resumed in place, the head's switch to the whole file on
+  the player that holds its place. `test_sound.js` (37 tests, two of them through the daemon: pause, resume, the
+  head's switch, "No sound?") passes on the merged service unchanged.
+- **Kept off on iDrive 8**: the control socket's new lock to the app's uid (the app has another id there and
+  MainApp-21's registry has not been read on a car: the socket stays as it is today).
+- **Sends nothing off the car**: upstream's "send logs" posts a report to its author's relay; in BeeMTube2 it
+  answers `closed` and sends nothing. Settings > Diagnostics shows the log on the screen as before.
+- **What changes under a car that works**, and so what a try on a car has to show: the decoder binary `ytdec`
+  (upstream's 0.5.7 one, sha256 `8c42bc7c...`: streaming and VP9 need it; the one in Beta 5 is 0.3.9's), the
+  fetcher `ytfetch.py`, and the service's play flow around the sound. The player binary `ytaud` is still the
+  kept release's.
+- **Its own version line**: the service is 8.0.0. Upstream's service has the same id (`jap-ridetube-d`) and its
+  own 0.5.x numbers; with both sources in the Store the two were confused. Remove the old source.
+- Not in the app yet (the service answers them, nothing on the screen asks): playlists, downloads and the Library,
+  repeat, related videos, the phone remote, the health page. Upstream's iDrive 7 input work (touchpad, controller)
+  is not taken.
+- Tests: upstream's and ours together, 240 in `test_ytd.js` (upstream's tests of its own audio descriptions are
+  left out with that code).
+
 ## Beta 5 - Service 0.5.3, app 0.7.1: sound on a car where BMW's player code cannot be read
 
 The main release. Reported from a second car, a 2023 M3 (G80): Beta 4 installed and started, the car gave its audio

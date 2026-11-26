@@ -1,4 +1,4 @@
-# Bringing upstream's playback upgrades into BeeMTube2 (Beta 6, not started)
+# Bringing upstream's playback upgrades into BeeMTube2 (Beta 6: the service is merged, see CHANGELOG.md)
 
 Measured on 2026-11-25 against `JustAnotherPU/ridetube` at `eb0973b` (app 0.6.4, service 0.5.4). Our fork left
 upstream at `6336494` (service 0.3.9). Nothing here is merged yet: `main` is Beta 5.
@@ -43,3 +43,9 @@ That is the code confirmed on the M2 and the M3 (pause, resume, the head's switc
 3. A service version upstream cannot collide with (theirs is 0.5.4 under the same id).
 4. Keep Beta 5 as the release `beta5`; publish as Beta 6; confirm on a car before anything else is built on it.
 5. Then the app: resume at the furthest point, playlists, downloads (21 places in `main.js`).
+
+## Done on the branch beta6 (2026-11-26, upstream at `199dbf8`, service 0.5.8)
+
+Steps 1 to 3 as planned; published as the release `beta6`, apart from the main release. Left: step 4's
+confirmation on a car, then making it the main release (keep Beta 5 as the release `beta5` first), then step 5,
+the app.
