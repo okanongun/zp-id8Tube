@@ -289,6 +289,7 @@ async function main() {
     assert.ok(disp.last.frame.words().length > wordsBefore, 'the veil is drawn');
     hu.ctx.settings.set('dim', '100');
     hu.ctx.settings.set('after', 'repeat');
+    await sleep(40); await hu.loopFn();
     np = d.cmds('play').length;
     d.send({ ev: 'state', state: 'ended', id: items[0].id, title: items[0].title });
     for (let i = 0; i < 24 && d.cmds('play').length === np; i++) { drive(0); await sleep(100); await hu.loopFn(); }
@@ -415,6 +416,115 @@ async function main() {
     assert.strictEqual(first(0), Math.max(0, after1 - 5), 'the arrow: five tiles back');
     snap('home-shelves');
     console.log('ok   shelves: dragged sideways by a finger, settle on a tile, the arrows turn them');
+
+    // ---- a service 8.0.0 (it answers `hello` with what it can do): the Library, playlists, Save, Up next, Repeat ----
+    assert.ok(d.cmds('hello').length === 1 && d.cmds('hello')[0].app === JSON.parse(fs.readFileSync(path.join(kitDir, 'app-spec.json'), 'utf8')).version, 'hello with the app version, once per connection');
+    assert.ok(target('rail:lib'), 'the rail has the Library');
+    assert.ok(!target('rail:wl'), 'Watch later is a shelf of the Library on iDrive 8, not a rail item');
+    // before the service said its caps: nothing of it is asked
+    await tapTarget(target('rail:lib'));
+    await sleep(80); await hu.loopFn();
+    assert.strictEqual(d.cmds('library').length + d.cmds('related').length + d.cmds('loop').length + d.cmds('download').length, 0, 'an older service is asked none of it');
+    assert.strictEqual(d.cmds('feed').filter((m) => m.which === 'hist').length, 0);
+    assert.strictEqual(d.cmds('playlists').length, 1, 'the playlists are asked (signed in)');
+    d.send({ ev: 'hello', service: '8.0.0', caps: ['related', 'hist', 'download', 'loop'] });
+    await until(() => d.cmds('library').length === 1, 2000, 'the downloads asked once the service says it has them');
+    const lists = [{ id: 'PLabcdefgh', title: 'Road trip', count: '12 videos', meta: ['Private'], thumb: items[2].id }, { id: 'PLzzzzzzzz', title: 'Workshop', count: null, meta: [], thumb: null }];
+    d.send({ ev: 'playlists', items: lists });
+    d.send({ ev: 'library', items: [{ id: items[5].id, title: items[5].title, channel: 'Cats 5', duration_s: 200, ready: true }, { id: items[6].id, title: 'Half', channel: 'Cats 6', duration_s: 100, ready: false, pct: 42 }] });
+    await tapTarget(target('rail:home')); await sleep(40); await hu.loopFn();
+    await tapTarget(target('rail:lib'));
+    await until(() => d.cmds('feed').some((m) => m.which === 'hist') && d.cmds('feed').some((m) => m.which === 'liked'), 2000, 'History and Liked asked');
+    d.send({ ev: 'feed', which: 'hist', items: items.slice(0, 4) });
+    d.send({ ev: 'feed', which: 'liked', items: items.slice(8, 11) });
+    await sleep(120); await hu.loopFn();
+    const keys = () => disp.pageTargets.map((t) => t.key);
+    assert.ok(target('l:0:' + items[5].id) && target('l:0:' + items[6].id), 'the downloads shelf: ' + keys().join(' '));
+    assert.ok(target('l:1:list:PLabcdefgh') && target('l:1:list:PLzzzzzzzz'), 'the playlists shelf');
+    assert.ok(target('l:2:' + items[0].id), 'the History shelf');
+    // Watch later: a shelf with a tile to its whole page
+    d.send({ ev: 'feed', which: 'wl', items: items.slice(9, 12) });
+    await sleep(80); await hu.loopFn();
+    assert.ok(target('l:1:::wl') && target('l:1:' + items[9].id) && target('l:2:list:PLabcdefgh'), 'Watch later between the downloads and the playlists: ' + keys().join(' '));
+    await tapTarget(target('l:1:::wl')); await sleep(60); await hu.loopFn();
+    assert.ok(target('w:0:' + items[9].id), 'its whole page');
+    d.send({ ev: 'feed', which: 'wl', items: [] });
+    await tapTarget(target('rail:lib')); await sleep(80); await hu.loopFn();
+    d.send({ ev: 'feed', which: 'wl', items: [] });
+    await sleep(80); await hu.loopFn();
+    // (Liked is the fourth row, below what a page lays out: seen with no downloads above it)
+    const libNow = { ev: 'library', items: [{ id: items[5].id, title: items[5].title, channel: 'Cats 5', duration_s: 200, ready: true }, { id: items[6].id, title: 'Half', channel: 'Cats 6', duration_s: 100, ready: false, pct: 42 }] };
+    d.send({ ev: 'library', items: [] });
+    await sleep(80); await hu.loopFn();
+    assert.ok(target('l:0:list:PLabcdefgh') && target('l:2:' + items[8].id), 'no downloads: playlists first, Liked third: ' + keys().join(' '));
+    d.send(libNow);
+    await sleep(80); await hu.loopFn();
+    assert.ok(d.cmds('thumb').some((m) => m.id === items[2].id), 'a playlist\'s cover is asked as that video\'s picture');
+    snap('library');
+    // a playlist: its videos as a grid, a tile back to the Library; a video of it plays with the rest as what is next
+    await tapTarget(target('l:1:list:PLabcdefgh'));
+    await until(() => d.cmds('playlist').length === 1 && d.cmds('playlist')[0].id === 'PLabcdefgh', 2000, 'the playlist asked by its id');
+    d.send({ ev: 'playlist', id: 'PLother', title: 'Not this one', items: items.slice(0, 2) });
+    d.send({ ev: 'playlist', id: 'PLabcdefgh', title: 'Road trip', items: items.slice(0, 7) });
+    await sleep(120); await hu.loopFn();
+    assert.ok(target('t:0:::lib') && target('t:0:' + items[0].id) && target('t:1:' + items[4].id), 'the playlist\'s grid: ' + keys().join(' '));
+    snap('playlist');
+    await tapTarget(target('t:0:::lib')); await sleep(60); await hu.loopFn();
+    assert.ok(target('l:1:list:PLabcdefgh'), 'back in the Library');
+    await tapTarget(target('l:1:list:PLabcdefgh')); await sleep(80); await hu.loopFn();
+    const nPlay = d.cmds('play').length;
+    await tapTarget(target('t:1:' + items[5].id));
+    await until(() => d.cmds('play').length === nPlay + 1 && d.cmds('play')[nPlay].id === items[5].id, 2000, 'a video of the playlist plays');
+    d.send({ ev: 'state', state: 'playing', id: items[5].id, title: items[5].title });
+    d.send({ ev: 'time', elapsed: 20000, total: 200000 });
+    await until(() => d.cmds('related').some((m) => m.id === items[5].id), 2000, 'what comes after it is asked');
+    assert.strictEqual(d.cmds('related').length, 1, 'once');
+    await sleep(100); await hu.loopFn();
+    const controls = async () => { await hu.loopFn(); if (!target('ov:prev')) { await tap(1400, 500); await sleep(520); drive(0); await hu.loopFn(); } };
+    // Save: the playing video is a download already (Saved); pressed twice it is removed. Another video: saved.
+    await controls();
+    assert.ok(target('ov:save'), 'the player has Save: ' + keys().join(' '));
+    await tapTarget(target('ov:save')); await hu.loopFn();
+    assert.strictEqual(d.cmds('remove').length, 0, 'a saved one: one press removes nothing');
+    await tapTarget(target('ov:save')); await sleep(40);
+    assert.deepStrictEqual(d.cmds('remove').map((m) => m.id), [items[5].id], 'pressed again: removed');
+    d.send({ ev: 'library', items: [{ id: items[6].id, title: 'Half', channel: 'Cats 6', duration_s: 100, ready: false, pct: 42 }] });
+    await sleep(80); await hu.loopFn();
+    await tapTarget(target('ov:save')); await sleep(40);
+    assert.deepStrictEqual(d.cmds('download').map((m) => [m.id, m.meta.title, m.quality]), [[items[5].id, items[5].title, hu.ctx.settings.get('quality')]], 'Save: the download asked with the tile\'s name and the quality');
+    snap('player-save');
+    // Up next: the playlist's own row first (Next plays its next); at the row's end, what YouTube plays after it
+    d.send({ ev: 'related', id: items[5].id, items: [{ id: items[5].id, title: 'itself' }, { id: 'rel00000001', title: 'Related one', channel: 'R', duration_s: 60 }] });
+    await sleep(60); await hu.loopFn();
+    await controls();
+    await tapTarget(target('ov:next'));
+    await until(() => d.cmds('play').length === nPlay + 2, 2000, 'Next');
+    assert.strictEqual(d.cmds('play')[nPlay + 1].id, items[6].id, 'the row\'s next first');
+    d.send({ ev: 'state', state: 'playing', id: items[6].id, title: 'Half' });
+    d.send({ ev: 'time', elapsed: 9000, total: 100000 });
+    await until(() => d.cmds('related').length === 2, 2000, 'asked for the new video');
+    d.send({ ev: 'related', id: items[6].id, items: [{ id: items[5].id, title: 'just played' }, { id: 'rel00000002', title: 'Related two', channel: 'R', duration_s: 60 }] });
+    await sleep(60); await hu.loopFn();
+    await controls();
+    assert.ok(target('ov:next'), 'the row is at its end (7 videos) and Next is still there: what YouTube plays next');
+    await tapTarget(target('ov:next'));
+    await until(() => d.cmds('play').length === nPlay + 3, 2000, 'Next past the row');
+    assert.strictEqual(d.cmds('play')[nPlay + 2].id, 'rel00000002', 'the first related video not just played');
+    d.send({ ev: 'state', state: 'playing', id: 'rel00000002', title: 'Related two' });
+    await sleep(60); await hu.loopFn();
+    // Repeat ("When a video ends"): told to the service, which plays it again itself; back to Next: told off
+    assert.strictEqual(d.cmds('loop').length, 0, 'no Repeat asked so far');
+    hu.ctx.settings.set('after', 'repeat');
+    await sleep(40); await hu.loopFn();
+    await until(() => d.cmds('loop').length === 1 && d.cmds('loop')[0].on === true, 2000, 'Repeat goes to the service');
+    hu.ctx.settings.set('after', 'next');
+    await sleep(40); await hu.loopFn();
+    await until(() => d.cmds('loop').length === 2 && d.cmds('loop')[1].on === false, 2000, 'and off again');
+    d.send({ ev: 'state', state: 'idle', id: null });
+    await sleep(60); await hu.loopFn();
+    await tap(40, 40); await sleep(60); await hu.loopFn();
+    drive(0); await sleep(30); await hu.loopFn();   // (the car keeps saying it stands: a stale speed counts as driving)
+    console.log('ok   Library: downloads, playlists, History and Liked; a playlist\'s page; Save and remove; Up next from YouTube; Repeat by the service');
 
     // the rail's Settings: the card (account), Sign out twice, the settings sheet
     d.send({ ev: 'auth', state: 'signed_in' });

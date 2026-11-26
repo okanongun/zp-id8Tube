@@ -59,7 +59,7 @@ async function clientAndModel() {
     await until(() => d.cmds('status').length, 2000, 'status on connect');
     assert.ok(m.connected, 'connected');
     await until(() => d.cmds('auth_status').length, 2000, 'auth_status on connect');
-    assert.deepStrictEqual(d.got.slice(0, 2), [{ cmd: 'status' }, { cmd: 'auth_status' }], 'on connect: status, then the account (no library: nothing is kept on the car)');
+    assert.deepStrictEqual(d.got.slice(0, 3), [{ cmd: 'hello', app: '0' }, { cmd: 'status' }, { cmd: 'auth_status' }], 'on connect: hello (a service 8.0.0 answers with what it can do), status, then the account; the library only once the service says it keeps one');
 
     // first results: no thumb asked on its own (the screens ask for the tiles they draw: wantThumb), each asked once
     assert.ok(m.search('first'));

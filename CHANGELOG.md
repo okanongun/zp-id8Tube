@@ -1,5 +1,28 @@
 # Changelog
 
+## Beta 7 - App 0.9.0, service 8.0.0: the Library, playlists, Save, Up next (the main release)
+
+The main release. **Not confirmed on a car**: neither this app nor the service 8.0.0 under it (Beta 6) has been
+reported from one. Beta 5 - confirmed on a G87 M2 and a G80 M3 - is kept as the release `beta5` and the branch
+`beta5` for going back; Beta 6 (the merged service with the app as it was) as the release `beta6`.
+
+The service is Beta 6's 8.0.0, the very package of the release `beta6`. The app now uses what it offers (it asks
+the service what it can do with `hello`; an older service is asked none of this):
+
+- **Library** (the rail; it takes Watch later's place there, which is now one of its shelves with a tile to its
+  whole page): **Saved on the car** (the downloads, each with its state: Saved, a percentage, Waiting, No space,
+  Failed), **Watch later**, **Playlists** (the account's; a tile shows a picture of one of its videos),
+  **History** and **Liked videos**.
+- **A playlist's page**: its videos as a grid; one tapped plays, the rest of the list after it.
+- **Save** in the player (left): keeps the playing video on the car at the chosen quality, so it plays without
+  internet. The service fetches it when nothing plays. Once saved, pressed twice it is removed.
+- **Up next**: when the row a video was picked from is at its end, Next - and "When a video ends: Next" - go on
+  with what YouTube plays after it (never the video itself, nor one just played).
+- **Repeat** ("When a video ends"): the service plays the video again itself, nothing fetched again; an older
+  service: the app starts it again as before.
+- Not taken from upstream: its phone remote, health page and "send logs" (BeeMTube2 sends no log off the car).
+- Tests: the Library, a playlist, Save and remove, Up next, Repeat (`kit/tools/test_ridetube8.js`, 16 groups).
+
 ## Beta 6 (to try) - Service 8.0.0, app 0.8.0: upstream's playback upgrades, the iDrive 8 sound kept
 
 **Not the main release.** Published on its own address, the release `beta6`, so nothing changes on a car until

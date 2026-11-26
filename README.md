@@ -23,9 +23,11 @@ By Waliworld (#tunedbywali). Based on [RideTube by JustAnotherPU](https://github
 | While driving: the sound plays on, no picture | Settings |
 | ![Start screen](docs/media/b2-start.png) | ![Zoom](docs/media/b2-player-zoom.png) |
 | The start screen | Picture size **Zoom 1** |
+| ![Library](docs/media/b2-library.png) | ![Save](docs/media/b2-player-save.png) |
+| The **Library**: saved on the car, Watch later, playlists, History, Liked | **Save** in the player keeps a video on the car |
 
 The screenshots are rendered on a computer at the car's 2880 x 960 with invented demo data
-(`docs/readme_shots.js`); the pictures in them are drawn stand-ins, not anyone's videos.
+(`docs/readme_shots.js`; the last two by `kit/tools/test_ridetube8.js` with `SHOTS=<folder>`); the pictures in them are drawn stand-ins, not anyone's videos.
 
 ## Confirmed on a car
 
@@ -36,7 +38,9 @@ The screenshots are rendered on a computer at the car's 2880 x 960 with invented
 | Not reported yet | Beta 4's additions: pages that glide, double tap to seek, Previous / Next, "When a video ends", picture brightness |
 | Second car | BMW M3 (G80, 2023), iDrive 8 |
 | Works there | install from the Store, the tile, the screen, Diagnostics; the car gives its audio focus |
-| Did not work there | **sound and picture with Beta 4** (service 0.5.2): no installed app on that car carries BMW's player code, which the service read on the M2 to learn how an item is written. **Beta 5** (service 0.5.3) asks every car the way the M2 plays first. Not reported yet |
+| Did not work there | sound and picture with Beta 4 (service 0.5.2): no installed app on that car carries BMW's player code, which the service read on the M2 to learn how an item is written |
+| Works there | **sound and picture with Beta 5** (service 0.5.3, which asks every car the way the M2 plays first), after a restart of the head unit |
+| Not reported yet, either car | Beta 6 and Beta 7: the service 8.0.0 (streaming, VP9, resume), the Library, Save, Up next |
 
 Two cars so far. Reports from other iDrive 8 cars are welcome in the issues, with photos of **Settings >
 Diagnostics** when something does not play.
@@ -49,11 +53,17 @@ Diagnostics** when something does not play.
   enter on your phone. BeeMTube2 never sees your password.
 - **Search** with its own on-screen keyboard; your recent searches are buttons (they work while driving, typing
   does not).
+- The **Library**: your **playlists**, **History**, **Liked videos** and Watch later, and the videos **saved on
+  the car**.
 - **Channel pages**, **Continue watching** with the place you stopped, video chapters on the progress bar.
 - Signed in, what you watch goes to your YouTube history, as on a TV. Members-only videos can be shown or hidden.
 
 **The player**
 
+- **Streaming**: a video plays while it is fetched (VP9 where the car decodes it), and resumes at the furthest
+  point you reached, on the car or on YouTube.
+- **Save** keeps the playing video on the car so it plays without internet; **Up next** goes on with what YouTube
+  plays after a video when its row is at its end; **Repeat** plays it again without fetching it again.
 - **Picture size**: Fit (the whole picture), Zoom 1, Zoom 2, or **Fill** - as wide as the screen. One button in the
   player steps through them at once; the sound plays on.
 - **Double tap to seek**: two quick taps on the right third of the picture go 10 s on, on the left third 10 s
@@ -102,18 +112,19 @@ For iDrive 7, use the original [RideTube](https://github.com/JustAnotherPU/ridet
 
 | Version | What it is | In the MGU Store: Add source | Branch |
 |---|---|---|---|
-| Beta 6 (**to try**, not confirmed on a car) | app 0.8.0 and service 8.0.0: upstream RideTube's playback upgrades - streaming, VP9, resume - with the iDrive 8 sound kept | the address `https://github.com/waliworld/iDrive8-RideTube/releases/download/beta6/catalog.json` | `beta6` |
-| **Beta 5** (the main release) | app 0.7.1 and **service 0.5.3**: sound on cars where BMW's player code cannot be read (a G80 M3) - every car is first asked the way the M2 plays | `waliworld/iDrive8-RideTube`, **Releases** | `main`, `beta5` |
+| **Beta 7** (the main release; not confirmed on a car yet) | app 0.9.0 and service 8.0.0: the **Library** (downloads, Watch later, playlists, History, Liked), **Save** a video on the car, **Up next** from YouTube, on upstream RideTube's newer service (streaming, VP9, resume) | `waliworld/iDrive8-RideTube`, **Releases** | `main`, `beta7` |
+| Beta 6 | app 0.8.0 and service 8.0.0: upstream's playback upgrades under the app as it was | the address `https://github.com/waliworld/iDrive8-RideTube/releases/download/beta6/catalog.json` | `beta6` |
+| Beta 5 (**confirmed on an M2 and an M3**) | app 0.7.1 and service 0.5.3: sound on cars where BMW's player code cannot be read | the address `https://github.com/waliworld/iDrive8-RideTube/releases/download/beta5/catalog.json` | `beta5` |
 | Beta 4 | app 0.7.0: gliding pages and shelves, double tap to seek, Previous / Next, when a video ends, picture brightness, the logo on the start screen | the address `https://github.com/waliworld/iDrive8-RideTube/releases/download/beta4/catalog.json` | `beta4` |
 | Beta 3 | app 0.6.0: the name BeeMTube2, picture size (zoom), the start screen | the address `https://github.com/waliworld/iDrive8-RideTube/releases/download/beta3/catalog.json` | `beta3` |
 | Beta 2 | app 0.5.0 (still named RideTube): picture size, the start screen | the address `https://github.com/waliworld/iDrive8-RideTube/releases/download/beta2/catalog.json` | `beta2` |
 | Beta 1 (stable) | app 0.4.6: the first version with sound and picture on a car | the address `https://github.com/waliworld/iDrive8-RideTube/releases/download/stable-1/catalog.json` | `beta1-stable` |
 
 Beta 1 to Beta 4 run the **same service package** (0.5.2, the one confirmed on the M2); only the app differs.
-Beta 5 has the service 0.5.3: a car that already plays keeps its way and is asked exactly as before. **To go
-back** on a car: add the older version's address as a source (easiest from the Store's phone page), uninstall the
-app (from Beta 5: the service "RideTube service" too), install again from that source, restart the head unit. The
-releases `stable-1`, `beta2`, `beta3` and `beta4` and their branches are kept as they are for that. [CHANGELOG.md](CHANGELOG.md) has every
+Beta 5 has the service 0.5.3, Beta 6 and Beta 7 the service 8.0.0 (upstream's newer one merged in, the iDrive 8
+sound kept). **To go back** on a car: add the older version's address as a source (easiest from the Store's phone
+page), uninstall the app and the service "RideTube service", install them again from that source, restart the
+head unit. The releases `stable-1` and `beta2` to `beta6` and their branches are kept as they are for that. [CHANGELOG.md](CHANGELOG.md) has every
 version.
 
 ## Settings

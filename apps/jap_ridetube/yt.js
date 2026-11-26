@@ -22,7 +22,8 @@ const net = require('net');
 
 const SOCKET = '/run/jap-ridetube-d/ctl.sock';
 const MAX_LINE = 1 << 20;            // a 320x180 thumb is 307 kB of base64; anything far past that is not ours
-const FEEDS = ['home', 'subs', 'wl'];
+const FEEDS = ['home', 'subs', 'wl', 'hist', 'liked'];   // (hist, liked: the Library page's, a service with the cap `hist`)
+const LIST_MAX = 60;                 // a playlist's page
 const FEED_MAX = 20;                 // a feed's flat list (its pictures: as many as drawn, main.js's pool)
 const SHELVES = 8, SHELF_MAX = 12;   // a feed's shelves, the videos in each
 const SIZES = ['160x90', '320x180']; // the thumb sizes the daemon sends
@@ -110,17 +111,27 @@ class Model {
         this.diag = null;            // the service's diagnostics, once asked: {lines, version, ready, t} (askDiag)
         this.note = null;            // what the service says it is doing while a play prepares (its 'note' events)
         this.snd = null;             // iDrive 8: the way to sound the service found by trying: {route, name, kept, silent}
+        // a service 8.0.0 or newer (it answers `hello` with what it can do; an older one: no caps)
+        this.caps = [];              // 'related', 'hist', 'download', 'loop', ...
+        this.lib = [];               // the downloads: [{id,title,channel,duration_s,ready,pct,error}], newest asked first
+        this.lists = null;           // the account's playlists: {items:[{id,title,thumb,count,meta}], loading, error, t}
+        this.list = null;            // the playlist shown: {id, title, items, loading, error, t}
+        this.related = null;         // what YouTube plays after the playing video: {id, items}
+        this.loop = false;           // the service repeats the playing video (Repeat)
         this.rev = 0;                // bumped on every change the screens show
     }
+    can(cap) { return this.caps.indexOf(cap) >= 0; }
     active() { return ACTIVE.indexOf(this.state) >= 0; }
     _changed() { this.rev++; }
 
     setConnected(on) {
         this.connected = on;
-        if (on) { this.send({ cmd: 'status' }); this.send({ cmd: 'auth_status' }); this.send({ cmd: 'positions' }); this.videoOn = null; this._video(); } else {
+        this.caps = []; this.related = null;
+        if (on) { this.send({ cmd: 'hello', app: this.appVersion || '0' }); this.send({ cmd: 'status' }); this.send({ cmd: 'auth_status' }); this.send({ cmd: 'positions' }); this.videoOn = null; this._video(); } else {
             this.searching = false; this.state = 'idle'; this.pending.clear();
             this.auth = { state: 'unknown', code: null, url: null, msg: null };
             Object.keys(this.feeds).forEach((w) => { this.feeds[w].loading = false; });
+            [this.lists, this.list].forEach((f) => { if (f) f.loading = false; });
         }
         this._changed();
     }
@@ -148,6 +159,11 @@ class Model {
             if (t && (t !== this.id || !this.title)) this.title = t;
             if (this.state !== 'error') this.error = null;
             if (this.state !== 'preparing') { this.retry = 0; this.note = null; }
+            if (this.state === 'playing' && this.id && this.can('related') && this.relAsked !== this.id) {
+                this.relAsked = this.id;
+                if (!this.related || this.related.id !== this.id) this.related = null;
+                this.send({ cmd: 'related', id: this.id });
+            }
             // the way to sound the service found by trying (iDrive 8): while it plays the player offers "No sound?"
             if (m.snd !== undefined) this.snd = m.snd && typeof m.snd === 'object' ? m.snd : null;
             if (this.state === 'idle' || (was !== 'preparing' && this.state === 'preparing')) { this.elapsed = 0; this.total = 0; }
@@ -155,7 +171,7 @@ class Model {
             if (this.state === 'playing' && was !== 'playing' && was !== 'paused') { this.videoOn = null; this._video(); }
         } else if (m.ev === 'auth') {
             this.auth = { state: String(m.state || 'signed_out'), code: m.code ? String(m.code) : null, url: typeof m.url === 'string' ? m.url : null, msg: m.msg ? String(m.msg) : null };
-            if (this.auth.state !== 'signed_in') { this.feeds = {}; this.chans = null; this.chan = null; this._prune(); }   // signed out: nobody's feed left on screen
+            if (this.auth.state !== 'signed_in') { this.feeds = {}; this.chans = null; this.chan = null; this.lists = null; this.list = null; this._prune(); }   // signed out: nobody's feed left on screen
         } else if (m.ev === 'channels') {
             if (!this.chans) return;
             this.chans.loading = false;
@@ -186,6 +202,37 @@ class Model {
                 if (!f.shelves.length) f.shelves = null;
                 this._prune();
             }
+        } else if (m.ev === 'hello') {
+            this.caps = (Array.isArray(m.caps) ? m.caps : []).filter((c) => typeof c === 'string').slice(0, 32);
+            if (this.can('download')) this.send({ cmd: 'library' });
+            if (this.can('loop') && this.loop) this.send({ cmd: 'loop', on: true });
+        } else if (m.ev === 'library') {
+            this.lib = valid(m.items, 100).map((r) => Object.assign(r, { ready: r.ready === true, pct: typeof r.pct === 'number' ? r.pct : null, error: r.error ? String(r.error) : null }));
+            this._prune();
+        } else if (m.ev === 'playlists') {
+            const l = this.lists;
+            if (!l) return;
+            l.loading = false;
+            if (m.error) l.error = String(m.error); else {
+                l.error = null;
+                l.items = (Array.isArray(m.items) ? m.items : []).filter((x) => x && typeof x.id === 'string' && /^[\w-]{2,64}$/.test(x.id)).slice(0, 40)
+                    .map((x) => ({ id: 'list:' + x.id, list: x.id, title: String(x.title || 'Playlist'), thumb: typeof x.thumb === 'string' && /^[\w-]{11}$/.test(x.thumb) ? x.thumb : null,
+                        meta: [x.count ? String(x.count) : null].concat(Array.isArray(x.meta) ? x.meta : []).filter((t) => typeof t === 'string' && t).slice(0, 2) }));
+                this._prune();
+            }
+        } else if (m.ev === 'playlist') {
+            const l = this.list;
+            if (!l || m.id !== l.id) return;                                          // another playlist's late answer
+            if (!m.partial) l.loading = false;
+            if (m.error) { l.loading = false; l.error = String(m.error); } else {
+                l.error = null; l.items = valid(m.items, LIST_MAX);
+                if (m.title) l.title = String(m.title);
+                this._prune();
+            }
+        } else if (m.ev === 'related') {
+            if (m.id !== this.id || m.error) return;
+            this.related = { id: String(m.id), items: valid(m.items, SHELF_MAX) };
+            this._prune();
         } else if (m.ev === 'positions') {
             this.pos = {};
             valid(m.items, 300).forEach((r) => { if (r.total > 0) this.pos[r.id] = r; });
@@ -222,7 +269,11 @@ class Model {
     _items() {
         const f = FEEDS.map((w) => this.feeds[w]).filter(Boolean);
         if (this.chan) f.push(this.chan);
-        return this.results.concat(this.resume, ...f.map((x) => x.items || []), ...f.map((x) => [].concat(...(x.shelves || []).map((s) => s.items))));
+        if (this.list) f.push(this.list);
+        if (this.related) f.push(this.related);
+        // (a playlist's tile shows the picture of one of its videos)
+        const covers = this.lists ? this.lists.items.filter((x) => x.thumb).map((x) => ({ id: x.thumb })) : [];
+        return this.results.concat(this.lib, covers, this.resume, ...f.map((x) => x.items || []), ...f.map((x) => [].concat(...(x.shelves || []).map((s) => s.items))));
     }
     _known(id) { return this._items().some((r) => r.id === id); }
     /** an item by its id (the first list that has it), or null */
@@ -319,10 +370,47 @@ class Model {
     /** a feed with no answer after ms: an error, as for searches */
     checkFeeds(now, ms) {
         let any = false;
-        FEEDS.map((w) => this.feeds[w]).concat([this.chans, this.chan])
+        FEEDS.map((w) => this.feeds[w]).concat([this.chans, this.chan, this.lists, this.list])
             .forEach((f) => { if (f && f.loading && now - f.t >= ms) { f.loading = false; f.error = 'No answer from the RideTube service'; any = true; } });
         if (any) this._changed();
         return any;
+    }
+    /** (re)load the account's playlists; shown meanwhile */
+    loadPlaylists() {
+        const l = this.lists = this.lists || { items: [] };
+        if (l.loading || this.auth.state !== 'signed_in') return false;
+        l.loading = true; l.error = null; l.t = Date.now();
+        this._changed();
+        if (this.send({ cmd: 'playlists' })) return true;
+        l.loading = false; l.error = 'The RideTube service (jap-ridetube-d) is not running';
+        return false;
+    }
+    /** show playlist id (its videos asked; the last one's stay if it is the same) */
+    openPlaylist(id, title) {
+        if (!this.list || this.list.id !== id) this.list = { id, title: String(title || ''), items: [] };
+        const l = this.list;
+        if (l.loading) return false;
+        l.loading = true; l.error = null; l.t = Date.now();
+        this._changed();
+        if (this.send({ cmd: 'playlist', id })) return true;
+        l.loading = false; l.error = 'The RideTube service (jap-ridetube-d) is not running';
+        return false;
+    }
+    /** the download of video id, or null */
+    saved(id) { return this.lib.find((r) => r.id === id) || null; }
+    /** keep a video on the car (it: its tile, for the name until it is fetched) */
+    download(id, it, quality) {
+        if (!this.can('download')) return false;
+        const r = it || this.item(id) || {};
+        return this.send({ cmd: 'download', id, meta: { title: String(r.title || this.title || id), channel: String(r.channel || ''), duration_s: r.duration_s > 0 ? r.duration_s : null }, quality });
+    }
+    remove(id) { return this.can('download') ? this.send({ cmd: 'remove', id }) : false; }
+    /** Repeat: the service plays the video again at its end (false: this service cannot, the app does it) */
+    setLoop(on) {
+        on = !!on;
+        if (!this.can('loop')) { this.loop = false; return false; }
+        if (on !== this.loop) { this.loop = on; this.send({ cmd: 'loop', on }); }
+        return true;
     }
     stop() { return this.active() ? this.send({ cmd: 'stop' }) : false; }
     /** while playing: the same video again at this quality, from where it is */

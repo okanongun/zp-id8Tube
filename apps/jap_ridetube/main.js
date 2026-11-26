@@ -79,7 +79,7 @@ const SEARCH_MS = 8000;                                  // a search with no ans
 const SUGGEST = ['Music', 'News', 'Cars', 'Podcasts', 'Comedy', 'Trailers'];
 const SLOTS = ['BTN_S1', 'BTN_S2', 'BTN_S3', 'BTN_S4', 'BTN_S5', 'BTN_S6'];
 const TABS = ['home', 'subs', 'wl'];
-const NAMES = { home: 'Home', subs: 'Subscriptions', wl: 'Watch later', results: 'Results' };
+const NAMES = { home: 'Home', subs: 'Subscriptions', wl: 'Watch later', results: 'Results', lib: 'Library', tracks: 'Playlist', hist: 'History', liked: 'Liked videos' };
 const FEED_MS = 15000;                                   // a feed with no answer by then is an error on screen
 const SIGNIN_URL = 'https://www.google.com/device';
 
@@ -101,6 +101,7 @@ mgu.run({
         /* ---------- the daemon ---------- */
         const ctl = new Ctl(process.env.MGU_YT_SOCKET || SOCKET, log);
         const model = new Model((o) => ctl.send(o));
+        model.appVersion = mgu.SPEC.version;
         let mode = 'home', browse = 'home', dirty = true;   // browse: the list the player goes back to
         const changed = () => { dirty = true; if (ctx.background) ctx.background('playing', model.active()); labels(); };
         const isFeed = (m) => FEEDS.indexOf(m) >= 0;
@@ -113,6 +114,13 @@ mgu.run({
             if (mode === 'home') model.feed('wl');
             if (mode === 'subs') model.loadChannels();                    // Home's last shelf (one request at a time: idempotent)
         };
+        // the Library (a service 8.0.0 or newer): the downloads come by themselves, the account's lists are asked
+        const openLib = () => {
+            if (model.auth.state !== 'signed_in') return;
+            model.loadPlaylists();
+            model.feed('wl');
+            if (model.can('hist')) { model.feed('hist'); model.feed('liked'); }
+        };
         const backKey = {};                              // page -> the tile the controller was on when it was left
         // motion (see animate): a page running on after a finger, the place it glides to, the finger and its last moves
         let fling = null, pageTo = null, finger = false, drag = [], shDrag = null, blockTap = 0, lastAnim = 0;
@@ -120,6 +128,7 @@ mgu.run({
             if (m !== mode) { dirty = true; fling = null; pageTo = null; shDrag = null; if (laid.mode === mode && laid.where[focusKey]) backKey[mode] = focusKey; }   // (a tile of this page)
             mode = m;
             if (m !== 'player') browse = m; else wake();
+            if (m === 'lib') openLib();
             openFeed(); sync(); labels();
         }
         function goBack(m) {
@@ -238,7 +247,13 @@ mgu.run({
         }
         // the player's Next: the next of the row the video was picked from. Previous: the video's start, or - in its
         // first 5 s - the video played before it (this one goes back to the head of what plays next)
-        function playNext() { const r = queue.shift(); if (r) play(r.id, r); }
+        // (the row at its end, a service that says what YouTube plays after a video: the first of those not just played)
+        const nextUp = () => {
+            if (queue.length) return queue[0];
+            const rel = model.related && model.related.id === model.id ? model.related.items : [];
+            return rel.find((r) => /^[\w-]{11}$/.test(r.id) && r.id !== model.id && !hist.some((h) => h.id === r.id)) || null;
+        };
+        function playNext() { const r = queue.length ? queue.shift() : nextUp(); if (r) play(r.id, r); }
         function playPrev() {
             if (model.elapsed > 5000 || !hist.length) { if (model.active()) model.skip(-model.elapsed); return; }
             const p = hist.pop();
@@ -250,15 +265,15 @@ mgu.run({
         const afterEnd = () => { const a = String(settings.get('after') || 'next'); return a === 'repeat' || a === 'stop' ? a : 'next'; };
         function autoNext() {
             const after = afterEnd();
-            if (model.state !== 'ended' || mode !== 'player' || after === 'stop' || (after === 'next' && !queue.length)) { nextAt = 0; return null; }
+            model.setLoop(after === 'repeat');
+            if (model.state !== 'ended' || mode !== 'player' || after === 'stop' || (after === 'next' && !nextUp())) { nextAt = 0; return null; }
             if (!nextAt) { nextAt = Date.now() + (after === 'repeat' ? 1500 : 5000); wake(); }
             if (after === 'repeat') {
                 if (Date.now() >= nextAt && model.id) { nextAt = 0; start(model.id, cur && cur.id === model.id ? cur.it : model.item(model.id)); }
                 return null;
             }
-            if (Date.now() < nextAt) return queue[0];
-            const r = queue.shift();
-            play(r.id, r);
+            if (Date.now() < nextAt) return nextUp();
+            playNext();
             return null;
         }
         let lastPlay = null, lastList = null, lastAcct = null;
@@ -409,6 +424,7 @@ mgu.run({
         if (ctx.onBack) ctx.onBack((edge) => {
             if (mode === 'player') { goBack(browse); return true; }
             if (mode === 'channel' && edge) { goBack(chanFrom); return true; }
+            if (mode === 'tracks' && edge) { goBack('lib'); return true; }
             return false;
         });
 
@@ -511,6 +527,8 @@ mgu.run({
             }],
             ['wl', 'Watch later', (cv, x, y, c) => { cv.arc(x, y, 14, 17.5, 0, 360, c); cv.line(x, y + 1, x, y - 9, 3.5, c); cv.line(x, y, x + 7, y + 5, 3.5, c); }],
         ];
+        // iDrive 8: the Library - downloads, playlists, History, Liked (three shelves' worth of spines)
+        const LIB = ['lib', 'Library', (cv, x, y, c) => { cv.roundRect(x - 17, y - 14, 7, 30, 2, c); cv.roundRect(x - 6, y - 14, 7, 30, 2, c); cv.quad([[x + 6, y - 11], [x + 12, y - 13], [x + 20, y + 14], [x + 14, y + 16]], c); }];
         // while something plays: back to the player (the bar's Now playing, where the kit runs the screen)
         const PLAYING = ['player', 'Playing', (cv, x, y, c) => { [10, 20, 14].forEach((h, k) => cv.roundRect(x - 15 + k * 11, y + 8 - h, 8, h + 8, 2, c)); }];
         // iDrive 8 (no HMI menu): the account and the settings (three sliders)
@@ -518,8 +536,9 @@ mgu.run({
             [[-12, -6], [0, 9], [12, -2]].forEach(([dy, kx]) => { cv.roundRect(x - 18, y + dy - 2, 36, 4, 2, c); cv.circle(x + kx, y + dy, 6, c); cv.circle(x + kx, y + dy, 2.5, bg); });
         }];
         function drawRail(cv) {
-            const sel = mode === 'results' ? 'search' : mode === 'channel' ? 'subs' : mode, bottom = H + (cv.own ? cv.extra : 0);
-            const items = (cv.own && model.active() ? RAIL.concat([PLAYING]) : RAIL).concat(ID8 ? [MORE] : []);
+            const sel = mode === 'results' ? 'search' : mode === 'channel' ? 'subs' : mode === 'tracks' || (ID8 && mode === 'wl') ? 'lib' : mode, bottom = H + (cv.own ? cv.extra : 0);
+            // (iDrive 8: Watch later is a shelf of the Library, whose place on the rail it takes - six items fit it)
+            const items = (ID8 ? RAIL.filter((r) => r[0] !== 'wl').concat([LIB]) : RAIL).concat(cv.own && model.active() ? [PLAYING] : [], ID8 ? [MORE] : []);
             const pitch = Math.min(100, (bottom - 156) / (items.length - 1));   // (the page down to the screen's bottom where it reaches)
             items.forEach(([m, name, glyph], i) => {
                 const cx = 62, cy = 96 + Math.round(i * pitch), on = m === sel, bg = on ? '#2c2c2c' : C.bg, c = on ? '#ffffff' : C.dim;
@@ -534,9 +553,10 @@ mgu.run({
         function drawTile(cv, r, x, y, key) {
             const cur = r.id === model.id && model.active();
             if (key === focusKey) cv.roundRect(x - 10, y - 10, TW + 20, TILE_H + 16, 18, C.card);
-            const th = model.thumbs[r.id];
-            if (!th) model.wantThumb(r.id);
-            const pid = th && cv.place ? slot(r.id, th) : null;
+            const tid = r.list ? r.thumb : r.id;         // (a playlist's tile: the picture of one of its videos)
+            const th = tid ? model.thumbs[tid] : null;
+            if (!th && tid) model.wantThumb(tid);
+            const pid = th && cv.place ? slot(tid, th) : null;
             if (pid) cv.picture(pid, x, y, TW, TH, 12);
             else { cv.roundRect(x, y, TW, TH, 12, C.ph); cv.circle(x + TW / 2, y + TH / 2, 30, '#ffffff10'); tri(cv, x + TW / 2 + 2, y + TH / 2, 24, '#ffffff38'); }
             const p = model.pos[r.id];   // watched (here, else on the account): a bar along the thumbnail's foot
@@ -550,6 +570,18 @@ mgu.run({
                 const d = clock(r.duration_s * 1000), dw = cv.textWidth(d, 20, LITB) + 16;
                 cv.roundRect(x + TW - 8 - dw, y + TH - 36, dw, 28, 6, '#000000cc');
                 cv.text(d, x + TW - 16, y + TH - 15, 20, '#ffffff', { literal: true, font: 'bold', align: 'right' });
+            }
+            // a playlist: a band saying so; a download: how far it is (Saved, 42 %, Waiting, or why not)
+            if (r.list) {
+                cv.roundRect(x + TW - 118, y + 10, 108, 28, 6, '#000000cc');
+                cv.text('PLAYLIST', x + TW - 64, y + 30, 16, '#ffffff', { literal: true, font: 'bold', spacing: 1, align: 'center' });
+            }
+            const dl = !r.list && !cur ? model.saved(r.id) : null;
+            if (dl) {
+                const t = dl.ready ? 'SAVED' : dl.error ? (dl.error === 'not enough space' ? 'NO SPACE' : 'FAILED') : dl.pct !== null ? Math.round(dl.pct) + ' %' : 'WAITING';
+                const pw = cv.textWidth(t, 16, { literal: true, font: 'bold', spacing: 1 }) + 20;
+                cv.roundRect(x + 10, y + 10, pw, 28, 6, dl.ready ? '#1b7f3b' : dl.error ? '#8a1c1c' : '#000000cc');
+                cv.text(t, x + 20, y + 30, 16, '#ffffff', { literal: true, font: 'bold', spacing: 1 });
             }
             if (cur) {
                 cv.strokeRoundRect(x - 2, y - 2, TW + 4, TH + 4, 14, 3, C.red);
@@ -629,6 +661,37 @@ mgu.run({
                 .map((s, i) => (i === 0 ? Object.assign({}, s, { title: c.title + (s.title ? ' · ' + s.title : ''), items: [tog].concat(s.items) }) : s)));
         }
 
+        /* The Library: what is kept on the car, the account's playlists, its History and Liked videos. */
+        function openTracks(l) { model.openPlaylist(l.list, l.title); show('tracks'); vs('tracks').sy = 0; resetOff('tracks'); }
+        function drawLib(cv) {
+            if (!model.connected) return say(cv, OFF, OFF2);
+            const a = model.auth.state === 'signed_in', secs = [];
+            if (model.lib.length) secs.push({ title: 'Saved on the car', sub: model.lib.filter((r) => r.ready).length + ' of ' + model.lib.length + ' ready - they play without internet', items: model.lib });
+            const l = model.lists, feedSec = (w) => { const f = model.feeds[w]; return f && f.items.length ? [{ title: NAMES[w], items: f.items.slice(0, SHELF_MAX) }] : []; };
+            const wl = model.feeds.wl;
+            if (a && wl && wl.items.length) {
+                const all = { id: '::wl', title: 'All of Watch later', sub: wl.items.length + ' videos', act: () => show('wl'), glyph: ALL };
+                secs.push({ title: 'Watch later', items: [all].concat(wl.items.slice(0, SHELF_MAX)) });
+            }
+            if (a && l && l.items.length) secs.push({ title: 'Playlists', sub: l.items.length + (l.items.length === 1 ? ' playlist' : ' playlists'), items: l.items.map((x) => Object.assign({ act: () => openTracks(x) }, x)) });
+            if (a) feedSec('hist').concat(feedSec('liked')).forEach((sc) => secs.push(sc));
+            if (!secs.length) {
+                if (!model.can('download') && !model.can('hist')) return say(cv, 'The Library needs a newer RideTube service', 'Update it in the Store (Tools), then restart the head unit');
+                if (!a) return say(cv, 'Nothing saved on the car yet', 'Sign in (Home) for your playlists, History and Liked videos - Save in the player keeps a video on the car');
+                return say(cv, l && l.loading ? 'Loading your library...' : l && l.error === 'feed offline' ? 'The video service is not reachable - check the car\'s internet connection' : 'Nothing here yet',
+                    l && l.loading ? null : 'Save in the player keeps a video on the car');
+            }
+            return drawPage(cv, secs);
+        }
+        function drawTracks(cv) {
+            const l = model.list;
+            if (!model.connected) return say(cv, OFF, OFF2);
+            if (!l) return say(cv, 'Pick a playlist in the Library');
+            if (!l.items.length) return say(cv, l.loading ? 'Loading ' + (l.title || 'the playlist') + '...' : l.error === 'feed offline' ? 'The video service is not reachable - check the car\'s internet connection' : l.error || 'No videos in this playlist');
+            const back = { id: '::lib', title: 'Library', sub: 'Back to your playlists', act: () => goBack('lib'), glyph: ALL };
+            return drawPage(cv, [{ title: l.title || 'Playlist', sub: l.items.length + (l.loading ? '+' : '') + ' videos', items: [back].concat(l.items), grid: true }]);
+        }
+
         // a shelf's arrow for touch: shifts it by four tiles. Its target goes before the tiles' (a tap on it is not
         // the tile under it), the drawing after them (returned: drawn by the caller once the tiles are)
         function chevron(cv, cx, cy, dir, run, key) {
@@ -693,7 +756,7 @@ mgu.run({
                 }
                 for (let i = Math.max(0, Math.floor(sh) - 1); i <= Math.min(n - 1, Math.ceil(sh) + PER_ROW); i++) {
                     const r = row.items[i], x = X0 + (i - sh) * PITCH, key = letter + ':' + ri + ':' + r.id;
-                    if (shown && x + TW > RAIL_W && x < W) (row.chan || r.act ? drawChan : drawTile)(cv, r, x, ty, key);
+                    if (shown && x + TW > RAIL_W && x < W) (row.chan || (r.act && !r.list) ? drawChan : drawTile)(cv, r, x, ty, key);
                     const go = r.act ? () => r.act() : row.chan ? () => openChannel(r) : () => play(r.id, r, row.items);
                     const run = () => { if (Date.now() < blockTap) return undefined; return go(); };   // (a finger that stopped a running page picks nothing)
                     if (cv.own) { cv.target(x - 10, ty - 10, TW + 20, TILE_H + 16, run, key, 18); where[key] = { ri, i }; }
@@ -931,6 +994,7 @@ mgu.run({
          */
         const OVK = ['ov:back', 'ov:qr', 'ov:snd', 'ov:rw', 'ov:play', 'ov:ff', 'ov:q', 'ov:zoom', 'ov:bar'];
         let sndArmed = 0;       // "No sound?" pressed once: a second press within 6 s says it
+        let saveArmed = 0;      // a saved video's Save pressed once: a second press within 5 s removes the download
         // podcast mode (driving): artwork, title, chapter, the bar with chapter ticks and skipped segments, controls
         // a glove can hit (-10 s, play/pause, +10 s, next in the row), the next video, a skipped-sponsor notice
         function drawPodcast(cv, SW, SH, LX, tg, run, live) {
@@ -1144,7 +1208,7 @@ mgu.run({
                         cv.fillRect(x + (dir > 0 ? 8 : -12), cy - 13, 4, 26, c);
                     });
                     step('ov:prev', cx - 380, -1, playPrev);
-                    if (queue.length) step('ov:next', cx + 380, 1, playNext);
+                    if (nextUp()) step('ov:next', cx + 380, 1, playNext);
                 }
                 // right: Video quality (a press takes the next one; the video starts again there) and zoom (fill crops)
                 const qv = String(settings.get('quality') || 'auto'), fl = settings.get('fill') !== false, qx = SW - 330, zx = SW - 150;
@@ -1178,6 +1242,22 @@ mgu.run({
                         cv.polyline([[sx + 23, cy - 9], [sx + 9, cy + 9]], 4, c);
                     });
                     cv.text(armed ? 'Press again: try another way' : 'No sound?', armed ? LX + 90 : sx, cy + 76, 22, armed ? '#ffd27a' : '#dddddd', { literal: true, align: armed ? 'left' : 'center' });
+                }
+                // left: Save - the playing video kept on the car (it plays without internet); once saved, pressed twice
+                // it is forgotten. The download itself runs when nothing plays (the service's rule).
+                if (ID8 && cv.own && model.can('download') && model.id) {
+                    const vx = LX + 330, dl = model.saved(model.id), armed = saveArmed > Date.now();
+                    ctl('ov:save', vx, cy, 42, () => {
+                        if (!dl) { model.download(model.id, cur && cur.id === model.id ? cur.it : null, settings.get('quality')); return; }
+                        if (saveArmed > Date.now()) { saveArmed = 0; model.remove(model.id); } else saveArmed = Date.now() + 5000;
+                    }, (c) => {
+                        if (dl && dl.ready) { cv.polyline([[vx - 16, cy + 1], [vx - 5, cy + 12], [vx + 17, cy - 12]], 5, c); return; }
+                        cv.line(vx, cy - 20, vx, cy + 6, 4.5, c);
+                        cv.polyline([[vx - 12, cy - 5], [vx, cy + 8], [vx + 12, cy - 5]], 4.5, c);
+                        cv.roundRect(vx - 18, cy + 15, 36, 4.5, 2, c);
+                    });
+                    const t = armed ? 'Press again to remove' : !dl ? 'Save' : dl.ready ? 'Saved' : dl.error ? (dl.error === 'not enough space' ? 'No space' : 'Failed') : dl.pct !== null ? 'Saving ' + Math.round(dl.pct) + ' %' : 'Saves after this video';
+                    cv.text(t, vx, cy + 76, 22, armed ? '#ffd27a' : '#dddddd', { literal: true, align: 'center' });
                 }
             } else if (model.state === 'error' && model.id && model.connected) {
                 ctl('ov:play', cx, cy, 58, again, (c) => retryGlyph(cv, cx, cy, 26, c));
@@ -1276,7 +1356,7 @@ mgu.run({
                 if (mode === 'player' && cv.own && cv.place && cv.place.full) drawFull(cv);
                 else {
                     if (browsing()) drawRail(cv);
-                    if (mode === 'player') drawPlayer(cv); else if (mode === 'channel') drawChannel(cv); else if (mode === 'results') drawResults(cv); else drawFeed(cv, isFeed(mode) ? mode : 'home');
+                    if (mode === 'player') drawPlayer(cv); else if (mode === 'channel') drawChannel(cv); else if (mode === 'lib') drawLib(cv); else if (mode === 'tracks') drawTracks(cv); else if (mode === 'results') drawResults(cv); else drawFeed(cv, isFeed(mode) ? mode : 'home');
                     // where the kit runs the screen the rail has the pages: the header shows just the name
                     if (cv.own) G.frame(cv, ctx.theme(), [], -1); else G.frame(cv, ctx.theme(), TABS.map((m) => NAMES[m]), TABS.indexOf(mode));
                 }
