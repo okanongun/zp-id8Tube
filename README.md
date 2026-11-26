@@ -34,8 +34,11 @@ The screenshots are rendered on a computer at the car's 2880 x 960 with invented
 | Car | BMW M2 (G87), iDrive 8 (Intel MGU21 head unit) |
 | Works there | install from the Store, the tile, the screen and touch, search and thumbnails, **sound and picture**, pause, the picture sizes (**zoom and Fill**) |
 | Not reported yet | Beta 4's additions: pages that glide, double tap to seek, Previous / Next, "When a video ends", picture brightness |
+| Second car | BMW M3 (G80, 2023), iDrive 8 |
+| Works there | install from the Store, the tile, the screen, Diagnostics; the car gives its audio focus |
+| Did not work there | **sound and picture with Beta 4** (service 0.5.2): no installed app on that car carries BMW's player code, which the service read on the M2 to learn how an item is written. **Beta 5** (service 0.5.3) asks every car the way the M2 plays first. Not reported yet |
 
-One car so far. Reports from other iDrive 8 cars are welcome in the issues, with photos of **Settings >
+Two cars so far. Reports from other iDrive 8 cars are welcome in the issues, with photos of **Settings >
 Diagnostics** when something does not play.
 
 ## Features
@@ -99,15 +102,17 @@ For iDrive 7, use the original [RideTube](https://github.com/JustAnotherPU/ridet
 
 | Version | What it is | In the MGU Store: Add source | Branch |
 |---|---|---|---|
-| **Beta 4** (the main release) | app 0.7.0: gliding pages and shelves, double tap to seek, Previous / Next, when a video ends, picture brightness, the logo on the start screen | `waliworld/iDrive8-RideTube`, **Releases** | `main`, `beta4` |
+| **Beta 5** (the main release) | app 0.7.1 and **service 0.5.3**: sound on cars where BMW's player code cannot be read (a G80 M3) - every car is first asked the way the M2 plays | `waliworld/iDrive8-RideTube`, **Releases** | `main`, `beta5` |
+| Beta 4 | app 0.7.0: gliding pages and shelves, double tap to seek, Previous / Next, when a video ends, picture brightness, the logo on the start screen | the address `https://github.com/waliworld/iDrive8-RideTube/releases/download/beta4/catalog.json` | `beta4` |
 | Beta 3 | app 0.6.0: the name BeeMTube2, picture size (zoom), the start screen | the address `https://github.com/waliworld/iDrive8-RideTube/releases/download/beta3/catalog.json` | `beta3` |
 | Beta 2 | app 0.5.0 (still named RideTube): picture size, the start screen | the address `https://github.com/waliworld/iDrive8-RideTube/releases/download/beta2/catalog.json` | `beta2` |
 | Beta 1 (stable) | app 0.4.6: the first version with sound and picture on a car | the address `https://github.com/waliworld/iDrive8-RideTube/releases/download/stable-1/catalog.json` | `beta1-stable` |
 
-All of them run the **same service package** (0.5.2, the one confirmed on a car); only the app differs. **To go
+Beta 1 to Beta 4 run the **same service package** (0.5.2, the one confirmed on the M2); only the app differs.
+Beta 5 has the service 0.5.3: a car that already plays keeps its way and is asked exactly as before. **To go
 back** on a car: add the older version's address as a source (easiest from the Store's phone page), uninstall the
-app (the service can stay), install it again from that source, restart the head unit. The releases `stable-1`,
-`beta2` and `beta3` and their branches are kept as they are for that. [CHANGELOG.md](CHANGELOG.md) has every
+app (from Beta 5: the service "RideTube service" too), install again from that source, restart the head unit. The
+releases `stable-1`, `beta2`, `beta3` and `beta4` and their branches are kept as they are for that. [CHANGELOG.md](CHANGELOG.md) has every
 version.
 
 ## Settings

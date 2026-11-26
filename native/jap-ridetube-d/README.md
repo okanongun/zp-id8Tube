@@ -91,6 +91,11 @@ on such a car works through the ways, the quick ones first, and keeps the first 
   the car's store for online media (`/mnt/share/ent/oe`) and in the app's `data` folder, a moment each; then
   `createPlaylist` in each form with the file in each place (also `file://`, `/run`, a local HTTP server), then
   each way to start it, BMW's own first. A way counts once the player says PLAY or its time moves. Minutes.
+  Since 0.5.3 a car that has kept no way is first asked **the way a car is known to play** (a G87 M2):
+  `DynamicMediaPlayerTempMedia`, BMW's item (`FILE_SIZE`, `ITEM_ID`, `FILE_NAME`, `pos`) with the id `03 B8` and a
+  count, the file where it is, started by `setCurrentItemPositionAndTime(token, 1, 0)` - written here, so a car
+  where no installed app carries BMW's code (a G80 M3) is asked the same. Not played: the search above, that
+  instance first, with the built-in ids beside those read; a list that says "empty" is given the start too.
 - `sdkread.js` reads, on the car, how BMW's own SDK asks the dynamic player: it loads an installed app's player
   class in a `vm` sandbox with every dependency replaced by a recording stub, in a child running as `nobody` with
   no environment, and records the item it builds, the ids its `generateItemId` gives per instance, the arguments

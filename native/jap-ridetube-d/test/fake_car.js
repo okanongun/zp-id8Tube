@@ -36,6 +36,7 @@ function fakeCar(ways) {
         loseFocusAfter: 0,          // the token stops being valid after this many createPlaylist calls (0: never)
         idOk: null,                 // (id, instance) => whether its list takes an item with this id (else: OK, the list stays empty)
         storeOk: null,              // (name, instance) => ... an item whose file is here
+        listAfterStart: false,      // its list says 0/0 of an item it took until that plays (the first car did)
     }, ways || {});
     const calls = car.calls = [];
     const st = car.st = {};            // per instance
@@ -96,7 +97,7 @@ function fakeCar(ways) {
                 if (n === 'connectionState') return s.conn;
                 if (n === 'playerState') return s.playing ? 'PLAYER_STATE_PLAY' : 'PLAYER_STATE_STOP';
                 if (n === 'currentAudioFocus') return { token: s.token || '', clientId: s.clientId || '', clientName: s.token ? 'RideTube' : '', status: s.token ? 'HAS_FOCUS' : 'HAS_FOCUS' };
-                if (n === 'currentItemPosition') return { position: s.item ? 1 : 0, totalNumber: s.item ? 1 : 0 };
+                if (n === 'currentItemPosition') { const in1 = s.item && (!car.listAfterStart || s.playing) ? 1 : 0; return { position: in1, totalNumber: in1 }; }
                 if (n === 'autoPlayStatus') return s.autoplay;
                 throw new Error('Unknown method name \'get:' + n + '\'');
             },

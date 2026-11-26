@@ -1,11 +1,41 @@
 # Changelog
 
+## Beta 5 - Service 0.5.3, app 0.7.1: sound on a car where BMW's player code cannot be read
+
+The main release. Reported from a second car, a 2023 M3 (G80): Beta 4 installed and started, the car gave its audio
+focus and answered `OK` to every playlist, and nothing played - no sound, so no picture (7 photographed pages of
+Diagnostics). Not confirmed on a car yet. Beta 4 is kept as the release `beta4` and the branch `beta4`.
+
+- **Why.** On the M2 the service learned how an item is written by reading BMW's own player code in an app
+  installed there. The M3 has no such app ("no installed app carries the SDK's player"), so the service fell back
+  to its older forms: an id of twelve bytes, no `ITEM_ID`. The car answers `OK` to those and keeps its list empty -
+  what the M2 did before 0.5.2.
+- **The way a car is known to play is now written in the service** and asked first on every car that has kept no
+  way of its own: `DynamicMediaPlayerTempMedia` (the instance that was heard), the focus with timer 0, BMW's item
+  (`FILE_SIZE`, `ITEM_ID`, `FILE_NAME`, `pos: 1`) with the four-byte id `03 B8` + a count, the file where the
+  service keeps it, started by `setCurrentItemPositionAndTime(token, 1, 0)`. Three calls; nothing is read or
+  searched before it.
+- **Not played that way**: the search as before, the instance that was heard first, now with the built-in ids
+  (each instance its type: Media 0, TempMedia 3, TempLumMedia 4; our app's number whole, its low byte, none)
+  beside those BMW's code gives where it can be read.
+- **A list that says "empty" is given the start.** The M2's list said 0/0 of an item it then played; the search
+  counted such an item as not taken. With the file where it is, each id now gets `position(1, 0)` and a moment.
+- **A car that plays already is asked exactly as before**: what it kept is used first, the forms read from BMW's
+  code go before the built-in ones and are not changed (a test compares every call with and without the new way).
+  "No sound?" on the known way leaves it out like any other.
+- Diagnostics: the first line says what a play asks first; "How BMW's own code plays a file" says what is asked
+  without it.
+- **The rest of the service is the confirmed package's**: against 0.5.2, the package differs in `sound.js`, the
+  version in `ytd.js` and `component.json` - nothing else. The player binary `ytaud` is taken from the kept release
+  `stable-1` (checked by its sha256) instead of being compiled again.
+- App 0.7.1: no change but the service it needs (0.5.3), so the Store updates both.
+
 ## Beta 4 - App 0.7.0: a smoother app, more in the player
 
 *The front page (README) was rewritten for BeeMTube2 afterwards: new screenshots (`docs/readme_shots.js`, rendered
 with invented demo data), every feature, the car it is confirmed on.*
 
-The main release. The service is not changed (0.5.2: the very package confirmed on a car). Not confirmed on a car
+The main release until Beta 5. The service is not changed (0.5.2: the very package confirmed on a car). Not confirmed on a car
 yet; Beta 3 is kept as the release `beta3` and the branch `beta3`.
 
 Smoother (iDrive 8, where the app draws its own screen):

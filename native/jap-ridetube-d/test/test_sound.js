@@ -39,6 +39,7 @@ async function unit(ways, o) {
     const seen = { state: [], time: [], error: [], note: [] }, lg = [];
     const opts = Object.assign({ someip: car.sip, srcGen: gen, oapRoot: oap, audioConf: path.join(root, 'audio.json'), stateDir: path.join(root, 'state'), id8: true, noSetuid: true, version: 'T1',
         playerWaitMs: 30, playerAfterMs: 30, availWaitMs: 300, dynWaitMs: 300, dynHeartbeatMs: 40, dynConnectMs: 300, dynListMs: 60, dynAutoMs: 120, dynStartWaitMs: 160, dynLookMs: 250, sdkGapMs: 0,
+        known: false,       // (these cars are ones nothing is known of: the search itself is what is tested; the tests of the known way switch it on)
         codeHomes: ['oap_12209'], runDir: path.join(root, 'run'), oeDir: path.join(root, 'oe'), procDir: path.join(root, 'proc'), direct: false, alsaCmd: [process.execPath, fakeAlsa], ytaud: path.join(root, 'ytaud'), directStartMs: 1500, scanMs: 300, scanBaseMs: 200, amSettleMs: 5,
         alsaEnv: Object.assign({ FAKE_ALSA_LOG: path.join(root, 'alsa.log'), FAKE_ALSA_WAYS: JSON.stringify(o.alsa || {}), FAKE_ALSA_STATE: car.stateFile }, o.alsaEnv || {}), log: (m) => lg.push(m) }, o.audio || {});
     const mk = () => new Audio(opts, { state: (v) => seen.state.push(v), time: (v) => seen.time.push(v), error: (v) => seen.error.push(v), note: (v) => seen.note.push(v) });
@@ -606,6 +607,132 @@ async function main() {
         fs.symlinkSync(u.file, path.join(u.root, 'proc', '1598', 'fd', '7'));
         assert.strictEqual(u.a.snd().readers(u.file), 'mediaengine');
         assert.strictEqual(u.a.snd().readers('/nowhere/else.m4a'), null);
+    });
+
+    // ---- the way a car is known to play (a G87 M2), for cars that have kept none ----
+    // a car as the G80 M3 answered 0.5.2: no installed app carries BMW's code, the focus with timer 0, OK to every
+    // playlist; its list takes an item whose id says our app and the instance, says "empty" until that plays, and
+    // only TempMedia is heard
+    const m3 = (more) => Object.assign({ start: 'pos', hbOk: (hb) => hb === 0, echo: false, listAfterStart: true,
+        idOk: (id, inst) => id.length === 4 && id[1] === 0xb8 && id[0] === { DynamicMediaPlayerMedia: 0, DynamicMediaPlayerTempMedia: 3, DynamicMediaPlayerTempLumMedia: 4 }[inst] }, more || {});
+
+    await t('a car where BMW\'s code cannot be read (the G80 M3): 0.5.2 asked ids no list takes and nothing played', async () => {
+        const u = await unit(m3(), { sdk: false, audio: { dynBudgetMs: 900, dynNextMs: 400 } });
+        await assert.rejects(u.a.play(u.head), /no way to play sound on this car has worked yet \(3 tried\)/);
+        assert.ok(u.car.dyn('createPlaylist').filter((c) => c.a.newPlaylist.length).every((c) => c.a.newPlaylist[0].id.length !== 4), 'never an id of four bytes');
+        assert.strictEqual(u.a.snd().lines()[0], 'No way to play sound is known for this car yet: a play tries them all.');
+        await u.a.release();
+    });
+
+    await t('the same car, asked the way a car is known to play: TempMedia, BMW\'s item with the id 03 B8, the file where it is, started by position - it plays at the first try, nothing else is asked, and that is kept', async () => {
+        const u = await unit(m3(), { sdk: false, audio: { known: true } });
+        assert.ok(/^Nothing is kept from a play on this car yet: a play first asks the way a car is known to play \(dyn:DynamicMediaPlayerTempMedia \| item sdk:ours-low \| file path \| start pos\), then tries the others\.$/.test(u.a.snd().lines()[0]), u.a.snd().lines()[0]);
+        const t0 = Date.now();
+        await u.a.play(u.head);
+        assert.ok(Date.now() - t0 < 2500, 'played in ' + (Date.now() - t0) + ' ms');
+        assert.deepStrictEqual(u.car.dyn().map((c) => c.inst.replace('DynamicMediaPlayer', '') + ' ' + c.m), ['TempMedia getAudioFocus', 'TempMedia createPlaylist', 'TempMedia setCurrentItemPositionAndTime'], u.story());
+        // the item whole, as the M2 took it
+        const it = item(u);
+        assert.deepStrictEqual(Object.keys(it), ['id', 'metadata', 'pos']);
+        assert.ok(it.id.equals(Buffer.from([3, 0xb8, 0, 1])), it.id.toString('hex'));
+        assert.deepStrictEqual(it.metadata, [{ key: 'FILE_SIZE', value: { numeric: 321 } }, { key: 'ITEM_ID', value: { id: Buffer.from([3, 0xb8, 0, 1]) } }, { key: 'FILE_NAME', value: { stringValue: u.head } }]);
+        assert.strictEqual(it.pos, 1);
+        assert.deepStrictEqual(u.car.dyn('getAudioFocus')[0].a, { clientId: 'jap_ridetube8', clientName: 'RideTube', timeOutHeartBeatTimer: 0 });
+        assert.deepStrictEqual(u.car.dyn('setCurrentItemPositionAndTime')[0].a.newPosition + '|' + u.car.dyn('setCurrentItemPositionAndTime')[0].a.newTimeElapsed, '1|0');
+        const k = u.kept();
+        assert.strictEqual([k.key, k.form, k.loc, k.start, k.clientId, k.hb, k.plays].join('|'), 'dyn:DynamicMediaPlayerTempMedia|sdk:ours-low|path|pos|jap_ridetube8|0|1');
+        assert.ok(/first the way a car is known to play: DynamicMediaPlayerTempMedia \| BMW's item, id 03B8xxxx \| where the file is \| started pos/.test(u.story()), u.story());
+        assert.ok(/createPlaylist \[BMW's item, id 03B8xxxx \| where the file is\] .* -> OK, list 0\/0 \(empty\) \| started position\(1, 0\): PLAYS/.test(u.story()), u.story());
+        assert.ok(/PLAYS through the car's dynamic media player \(TempMedia\)/.test(u.story()));
+        // the head's switch to the whole file: the same way, the id counted on
+        await u.a.replay(u.file);
+        assert.ok(item(u).id.equals(Buffer.from([3, 0xb8, 0, 2])) && item(u).metadata[2].value.stringValue === u.file && item(u).metadata[0].value.numeric === 1234);
+        // the page says what is asked without BMW's code (it is looked for by the search only: here by hand)
+        await u.a.snd().readSdk();
+        const pl = u.a.snd().playLines();
+        assert.ok(/^BMW's own player code: NOT read: no installed app carries the SDK's player/.test(pl[0]), pl[0]);
+        assert.strictEqual(pl[1], 'Asked without it, as a car is known to take it (a G87 M2): the item with FILE_SIZE, ITEM_ID, FILE_NAME and an id of four bytes - Media 03B8xxxx / A0B8xxxx / 0000xxxx | TempMedia 03B8xxxx / A3B8xxxx / 0300xxxx | TempLumMedia 04B8xxxx / A4B8xxxx / 0400xxxx'.replace('Media 03B8xxxx / A0B8xxxx', 'Media 00B8xxxx / A0B8xxxx'));
+        await u.a.release();
+        // the next start of the service plays the kept way: the same three calls
+        const b = u.mk();
+        await b.start();
+        b.playInfo = { durationMs: 180000, id: 'vid12345678' };
+        const n0 = u.car.dyn().length;
+        await b.play(u.file);
+        assert.deepStrictEqual(u.car.dyn().slice(n0).map((c) => c.inst.replace('DynamicMediaPlayer', '') + ' ' + c.m), ['TempMedia getAudioFocus', 'TempMedia createPlaylist', 'TempMedia setCurrentItemPositionAndTime']);
+        assert.strictEqual(b.snd().state.kept.plays, 2);
+        await b.release();
+    });
+
+    await t('the known way where the car wants another id: asked once, then the search finds this car\'s own (the ids without BMW\'s code, each instance its type)', async () => {
+        // (a car whose list takes the app's whole number, A3 B8 on TempMedia; Media takes none)
+        const u = await unit(m3({ idOk: (id, inst) => id.length === 4 && id[0] === 0xa3 && id[1] === 0xb8 && inst === 'DynamicMediaPlayerTempMedia' }), { sdk: false, audio: { known: true } });
+        await u.a.play(u.file);
+        assert.strictEqual([u.kept().key, u.kept().form, u.kept().loc].join('|'), 'dyn:DynamicMediaPlayerTempMedia|sdk:ours|path', u.story());
+        const ids = u.car.dyn('createPlaylist').filter((c) => c.a.newPlaylist.length).map((c) => c.a.newPlaylist[0].id.toString('hex').slice(0, 4));
+        assert.strictEqual(ids[0], '03b8', 'the known one first');
+        assert.ok(ids.indexOf('a3b8') > 0 && ids.every((x) => /^(03b8|a3b8|0300)$/.test(x)), ids.join(' '));
+        assert.ok(u.car.dyn().every((c) => c.inst === 'DynamicMediaPlayerTempMedia'), 'the instance that was heard on a car is searched first');
+        await u.a.release();
+    });
+
+    await t('the known way played and the driver hears nothing ("No sound?"): it is left out, the next play searches the other instances with the item a car takes', async () => {
+        const u = await unit(m3(), { sdk: false, audio: { known: true } });
+        await u.a.play(u.file);
+        assert.ok(/TempMedia/.test(u.a.snd().nosound()));
+        assert.strictEqual(u.a.snd().known(), null);
+        await u.a.release();
+        const n0 = u.car.dyn().length;
+        await u.a.play(u.file);
+        assert.strictEqual([u.kept().key, u.kept().form].join('|'), 'dyn:DynamicMediaPlayerMedia|sdk:ours-low', u.story());
+        assert.ok(item(u).id.slice(0, 2).equals(Buffer.from([0, 0xb8])));
+        assert.ok(u.car.dyn().slice(n0).every((c) => c.inst !== 'DynamicMediaPlayerTempMedia'), 'the one not heard is not asked again');
+        assert.ok(/^Played without sound \(left out; .*: dyn:DynamicMediaPlayerTempMedia$/.test(u.a.snd().lines()[1]), u.a.snd().lines()[1]);
+        await u.a.release();
+    });
+
+    await t('a car that keeps a way (the M2) is asked exactly as before: the known way changes no call there, and BMW\'s code as read goes before what is built in', async () => {
+        const ways = () => ({ start: 'pos', hbOk: (hb) => hb === 0, idOk: (id, inst) => id.length === 4 && id[0] === 0x02 && id[1] === 0xb8 && inst === 'DynamicMediaPlayerTempMedia' });
+        const calls = [];
+        for (const known of [false, true]) {
+            // found by the search of 0.5.2 (BMW's code read: its type for TempMedia is 2 in this stand-in) ...
+            const u = await unit(ways(), { sdk: { id8: true }, donor: { name: 'message_handling', oapAppSettings: JSON.stringify({ loggingId: 'OA15' }) }, audio: { known: false } });
+            await u.a.play(u.file);
+            assert.strictEqual([u.kept().key, u.kept().form, u.kept().loc].join('|'), 'dyn:DynamicMediaPlayerTempMedia|sdk:ours-low|path', u.story());
+            await u.a.release();
+            // ... then the service is started again, with and without the known way
+            const b = new (require('../ytd.js').Audio)(Object.assign({}, u.opts, { known: known }), {});
+            await b.start();
+            b.playInfo = { durationMs: 180000, id: 'vid12345678' };
+            assert.strictEqual(b.snd().known(), null);
+            const n0 = u.car.dyn().length;
+            await b.play(u.file);
+            calls.push(JSON.stringify(u.car.dyn().slice(n0).map((c) => [c.inst, c.m, c.m === 'createPlaylist' ? c.a.newPlaylist.map((i) => [i.id.toString('hex').slice(0, 4), i.metadata.map((m) => m.key)]) : c.m === 'getAudioFocus' ? [c.a.clientId, c.a.timeOutHeartBeatTimer] : null])));
+            // the forms: those read first and unchanged, the built-in ones only for ids the reading did not give
+            const f = b.snd().idForms('DynamicMediaPlayerTempMedia');
+            assert.deepStrictEqual(f.filter((x) => !x.builtin).map((x) => x.key + ' ' + x.id), ['sdk:ours A2B8xxxx', 'sdk:theirs A215xxxx', 'sdk:ours-low 02B8xxxx', 'sdk:theirs-low 0215xxxx', 'sdk:none 0200xxxx']);
+            assert.deepStrictEqual(f.filter((x) => x.builtin).map((x) => x.key + ' ' + x.id), known ? ['sdk:ours A3B8xxxx', 'sdk:ours-low 03B8xxxx', 'sdk:none 0300xxxx'] : []);
+            assert.ok(f.slice(0, 5).every((x) => !x.builtin));
+            await b.release();
+        }
+        assert.strictEqual(calls[0], calls[1]);
+        assert.ok(/"02b8"/.test(calls[0]) && /setCurrentItemPositionAndTime/.test(calls[0]), calls[0]);
+    });
+
+    await t('a car without the instance that was heard: nothing is known to ask first, the search as before; one that has it and gets no answer from it: asked, then the search', async () => {
+        const u = await unit({ start: 'pos' }, { dmp: Object.assign({}, DMP, { instances: { DynamicMediaPlayerMedia: 1, DynamicMediaPlayerInterrupt: 5 } }), audio: { known: true } });
+        assert.strictEqual(u.a.snd().known(), null);
+        assert.strictEqual(u.a.snd().lines()[0], 'No way to play sound is known for this car yet: a play tries them all.');
+        await u.a.play(u.file);
+        assert.strictEqual(u.kept().key, 'dyn:DynamicMediaPlayerMedia');
+        assert.ok(!/first the way a car is known to play/.test(u.story()));
+        await u.a.release();
+        const v = await unit({ start: 'pos', insts: { DynamicMediaPlayerMedia: true } }, { audio: { known: true } });
+        assert.ok(v.a.snd().known());
+        await v.a.play(v.file);
+        assert.strictEqual(v.kept().key, 'dyn:DynamicMediaPlayerMedia', v.story());
+        assert.ok(/NOT through the car's dynamic media player \(TempMedia\)/.test(v.story()), v.story());
+        await v.a.release();
     });
 
     await t('through the daemon: a play prepares with notes, plays with the way found in its state; pause and resume; "No sound?" goes on with the next way from where it was; the page; start over', async () => {

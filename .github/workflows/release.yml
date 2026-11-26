@@ -2,9 +2,9 @@
 # waliworld/iDrive8-RideTube, Releases) from main. Every component whose version did not change since the kept
 # release "stable-1" (the first version confirmed on a car) is taken from there as it is (tools/channel.py pin),
 # so the service a car runs stays the very package that was confirmed until its version changes.
-# Kept for going back, and never rebuilt by this workflow: the releases "stable-1" (Beta 1), "beta2" (Beta 2) and
-# "beta3" (Beta 3, copied from the main release by the run that first replaces it), the branches beta1-stable,
-# beta2 and beta3.
+# Kept for going back, and never rebuilt by this workflow: the releases "stable-1" (Beta 1), "beta2" (Beta 2),
+# "beta3" (Beta 3) and "beta4" (Beta 4, copied from the main release by the run that first replaces it), the
+# branches beta1-stable, beta2, beta3 and beta4.
 # Runs when main changes in what goes into the release, or by hand (Actions, Run workflow).
 name: Release (MGU Store catalog)
 
@@ -40,22 +40,22 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Keep Beta 3 as the release "beta3" before it is replaced (once)
+      - name: Keep Beta 4 as the release "beta4" before it is replaced (once)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           base=https://github.com/waliworld/iDrive8-RideTube/releases/download
-          if curl -fsSL -o /dev/null "$base/beta3/catalog.json"; then echo "beta3 is kept already"; exit 0; fi
-          # (the main release is Beta 3 until this run publishes: app 0.6.0 with the service of stable-1)
-          if python3 tools/channel.py freeze "$base/catalog/catalog.json" beta3 "$RUNNER_TEMP/beta3" \
-               --expect jap_ridetube8=0.6.0 --expect jap-ridetube-d=0.5.2; then
-            gh release view beta3 >/dev/null 2>&1 || gh release create beta3 --target 5f8424791ea7ee2fb17e0a7be3cb49eda0ac8106 --latest=false \
-              --title "BeeMTube2 for iDrive 8 - Beta 3 (kept for going back)" \
-              --notes "Beta 3 as it was the main release: app 0.6.0, service 0.5.2. A copy for keeping, never rebuilt. To go back to it, add the address of this release's catalog.json as a source in the MGU Store, uninstall the app and install it again from there."
-            gh release upload beta3 "$RUNNER_TEMP"/beta3/* --clobber
-            echo "kept:"; ls -l "$RUNNER_TEMP/beta3"
+          if curl -fsSL -o /dev/null "$base/beta4/catalog.json"; then echo "beta4 is kept already"; exit 0; fi
+          # (the main release is Beta 4 until this run publishes: app 0.7.0 with the service of stable-1)
+          if python3 tools/channel.py freeze "$base/catalog/catalog.json" beta4 "$RUNNER_TEMP/beta4" \
+               --expect jap_ridetube8=0.7.0 --expect jap-ridetube-d=0.5.2; then
+            gh release view beta4 >/dev/null 2>&1 || gh release create beta4 --target 7e392d38df17d33ac258b87c3086eae36ce30553 --latest=false \
+              --title "BeeMTube2 for iDrive 8 - Beta 4 (kept for going back)" \
+              --notes "Beta 4 as it was the main release: app 0.7.0, service 0.5.2. A copy for keeping, never rebuilt. To go back to it, add the address of this release's catalog.json as a source in the MGU Store, uninstall the app and the RideTube service and install them again from there."
+            gh release upload beta4 "$RUNNER_TEMP"/beta4/* --clobber
+            echo "kept:"; ls -l "$RUNNER_TEMP/beta4"
           else
-            echo "::warning::the main release is not Beta 3 any more: nothing kept as beta3"
+            echo "::warning::the main release is not Beta 4 any more: nothing kept as beta4"
           fi
 
       - name: Test tools (ffmpeg and jpegtran make the tests' media; gcc with the static libc builds ytaud)
@@ -74,8 +74,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          title="BeeMTube2 for iDrive 8 - Beta 4 (MGU Store catalog, the main release)"
-          notes="The MGU Store reads catalog.json here. In the Store: Settings, Add source, \`waliworld/iDrive8-RideTube\`, Releases. Then install BeeMTube2 and restart the head unit. Rebuilt by the Release workflow on every change to main. Older versions of the packages stay attached below. To go back: Beta 3 is the release \`beta3\`, Beta 2 the release \`beta2\`, Beta 1 (stable) the release \`stable-1\` - add the address of its catalog.json as a source, uninstall the app, install it again from there. Based on RideTube by JustAnotherPU."
+          title="BeeMTube2 for iDrive 8 - Beta 5 (MGU Store catalog, the main release)"
+          notes="The MGU Store reads catalog.json here. In the Store: Settings, Add source, \`waliworld/iDrive8-RideTube\`, Releases. Then install BeeMTube2 and restart the head unit. Rebuilt by the Release workflow on every change to main. Older versions of the packages stay attached below. To go back: Beta 4 is the release \`beta4\`, Beta 3 the release \`beta3\`, Beta 2 the release \`beta2\`, Beta 1 (stable) the release \`stable-1\` - add the address of its catalog.json as a source, uninstall the app and the RideTube service, install them again from there. Based on RideTube by JustAnotherPU."
           if gh release view catalog >/dev/null 2>&1; then
             gh release edit catalog --title "$title" --notes "$notes" --latest
           else

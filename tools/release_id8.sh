@@ -3,7 +3,7 @@
 # tagged "catalog" of waliworld/iDrive8-RideTube:
 #   jap_ridetube8    RideTube for iDrive 8, as a source package the head unit builds (kit/tools/build.py --hmi ID8)
 #   jap-ridetube-d   its service (packed here; ytdec and ytdlp.pyz as in JustAnotherPU's release 0.3.9, checked below;
-#                    ytaud built here from native/ytaud and FAAD2)
+#                    ytaud - native/ytaud and FAAD2 - as in this repository's kept release stable-1, checked below)
 #   jap-node22       Node.js 22 for the service (packed here from tools/jap-node22; the binary as in JustAnotherPU/mgu-apps)
 # Usage: MGU_STORE=<a clone of github.com/robertnisipeanu/mgu-store> tools/release_id8.sh
 # The prebuilt binaries are taken from JustAnotherPU's published releases and checked against the sha256 pinned here
@@ -59,7 +59,12 @@ node kit/tools/test_ridetube8.js >/dev/null
 MGU_STORE="$MGU_STORE" node kit/tools/test_mgu8.js | tail -1 | grep -q '^mgu8: all ok$' || { echo "release_id8.sh: kit/tools/test_mgu8.js did not pass (or was skipped)" >&2; exit 1; }
 # ytaud, the AAC decoder of the service's own player (iDrive 8 without the car's player): built here from ytaud.c and
 # FAAD2 at its pinned commit, static (native/ytaud/build.sh), then tested against ffmpeg's decoder
-sh "$root/native/ytaud/build.sh" "$d/build/ytaud"
+# Since the service 0.5.3 the binary is the very one of the package confirmed on a car (the kept release stable-1,
+# 0.5.2; native/ytaud has not changed since), so a new service version changes nothing a car already ran. To build
+# it instead (after a change to native/ytaud): sh native/ytaud/build.sh "$d/build/ytaud", and drop the two lines.
+fetch "https://github.com/waliworld/iDrive8-RideTube/releases/download/stable-1/jap-ridetube-d@0.5.2.tgz" 81a6017f3afaf68c582f7c5ab2e06ce5d83d7899bcdb96324b964f0ef76e415a "$dl/jap-ridetube-d@0.5.2.tgz"
+take "$dl/jap-ridetube-d@0.5.2.tgz" files/ytaud 26342ae67f8ce437ac6e1d403fa37711a7c12584b960588f32a48c27093b4440 "$d/build/ytaud"
+chmod 755 "$d/build/ytaud"
 python3 -I "$root/native/ytaud/test_ytaud.py" "$d/build/ytaud" >/dev/null || { echo "release_id8.sh: native/ytaud/test_ytaud.py did not pass" >&2; exit 1; }
 (cd "$d" && node test/test_ytd.js >/dev/null && node test/test_sdkread.js >/dev/null && node test/test_sound.js >/dev/null && node test/test_thumb.js >/dev/null)
 python3 -I "$d/test/test_ytalsa.py" >/dev/null || { echo "release_id8.sh: test_ytalsa.py did not pass" >&2; exit 1; }

@@ -135,6 +135,12 @@ function appLoggingId(home) {
 
 const START_CALLS = ['setCurrentItemPositionAndTime', 'sendButtonEventDirect', 'setAutoplay', 'setPlaybackSpeed', 'setMuteState', 'configureButtonEventForwarding'];
 const DYN_INSTS = [/^DynamicMediaPlayerMedia$/, /^DynamicMediaPlayerTempMedia$/, /^DynamicMediaPlayerTempLumMedia$/];
+/* What a car is known to take (a G87 M2, service 0.5.2; BMW's code was read on that car): the type an item's id
+ * carries for each entertainment instance, the number our app's logging id gives it ("RTB8": the low byte alone
+ * was the one), the instance that was heard, the file where it is, the start. A car where BMW's code cannot be
+ * read (no installed app carries it) is asked this way; every car is asked this way first. */
+const KNOWN_TYPES = { DynamicMediaPlayerMedia: 0, DynamicMediaPlayerTempMedia: 3, DynamicMediaPlayerTempLumMedia: 4 };
+const KNOWN = { key: 'dyn:DynamicMediaPlayerTempMedia', form: 'sdk:ours-low', loc: 'path', start: 'pos', known: true };
 const FATAL = /^(ITEM_UNPLAYABLE|ITEM_CORRUPTED|ITEM_NO_DATA|DRM|NO_NETWORK)$/;
 const STATE_V = 1;
 
@@ -579,6 +585,20 @@ DynRoute.prototype.attempt = async function (form, loc, file, starts, quick, pro
         if (listed || Date.now() >= listEnd || this.s.cancelled) break;
     }
     if (probe && !listed) {
+        // (the first car's list said "empty" of an item it then played: where asked, the start that played there
+        // is given a moment before the item is counted as not taken)
+        const st = probe === 'start' ? starts.filter((x) => x.key === 'pos')[0] : null;
+        if (st) {
+            try { await st.run(); } catch (e) { /* the list did not take it */ }
+            await this.waitPlay(Math.min(st.ms, 1500));
+            if (this.playingNow()) {
+                this.say('createPlaylist ' + tag + ' ' + show(item, 300) + ' -> OK, list ' + (pos ? pos.position + '/' + pos.totalNumber : '?') + ' (empty) | started ' + st.name + ': PLAYS');
+                shown[fam] = true;
+                this.got = null;
+                this.s.tried(key, 'PLAYS (' + st.key + ')');
+                return { out: 'playing', start: st.key };
+            }
+        }
         this.got = null;
         this.s.tried(key, 'taken, the list stays empty');
         return { out: 'empty', item: item };
@@ -653,6 +673,27 @@ DynRoute.prototype.play = async function (file, info, hint) {
     };
     let n = 0, lastWhy = null, taken = 0, inList = 0, itemError = null;
     let queue = forms.map((f) => [f, locs[0]]), later = [];
+    // The way a car is known to play (not one kept on this car): asked once, whole - its list said "empty" on that
+    // car and the start played it all the same. Not played: the search goes as on a car nothing is known of.
+    if (hint && hint.known) {
+        const f = by(ids, hint.form), l = by(locs, hint.loc);
+        hint = null;
+        if (f && l) {
+            this.say('first the way a car is known to play: ' + this.inst + ' | ' + f.name + ' | ' + l.name + ' | started ' + KNOWN.start);
+            this.s.note('Starting the sound...');
+            let r = await this.attempt(f, l, file, starts, false);
+            if (r.out === 'token' || r.out === 'conn') { await recover(r.out); r = await this.attempt(f, l, file, starts, false); }
+            n++;
+            done[this.key + '|' + f.key + '|' + l.key] = true;
+            if (r.out === 'playing') {
+                this.combo = { form: f.key, loc: l.key, start: r.start };
+                this.say('PLAYS: ' + this.inst + ' | ' + f.name + ' | ' + l.name + ' | started ' + r.start);
+                return;
+            }
+            lastWhy = r.why || r.out;
+            this.lastTries = null;
+        }
+    }
     // The car's player answers OK to a playlist and leaves its list empty. BMW's own code gives an item an id of
     // four bytes that says which app and which player instance it is for (ours was all zeros), and the player's
     // configuration names a store for online media. So first, a moment each: BMW's item with every id an app could
@@ -673,10 +714,12 @@ DynRoute.prototype.play = async function (file, info, hint) {
         };
         for (const f of ids) {
             for (const l of pl) {
-                if (stop || this.s.cancelled || not[l.key]) continue;
+                if (stop || this.s.cancelled || not[l.key] || done[this.key + '|' + f.key + '|' + l.key]) continue;
                 this.s.note('Finding how this car plays sound: way ' + this.s.count() + '...');
-                let r = await this.attempt(f, l, file, starts, false, true);
-                if (r.out === 'token' || r.out === 'conn') { await recover(r.out); r = await this.attempt(f, l, file, starts, false, true); }
+                // (where the file is: with the start too - a list may say "empty" of an item it plays)
+                const how = l.key === 'path' ? 'start' : true;
+                let r = await this.attempt(f, l, file, starts, false, how);
+                if (r.out === 'token' || r.out === 'conn') { await recover(r.out); r = await this.attempt(f, l, file, starts, false, how); }
                 n++;
                 if (r.out !== 'empty' && r.out !== 'unprepared') done[this.key + '|' + f.key + '|' + l.key] = true;
                 if (r.out === 'playing') {
@@ -1061,6 +1104,36 @@ Sound.prototype.logIds = function (donor) {
  * else the template's id is written here with the types 1 to 6. Each use counts the id's last two bytes on. */
 Sound.prototype.idForms = function (inst) {
     const r = this.sdk, out = [], seen = {};
+    this.readForms(inst, r, out, seen);
+    // then the item a car is known to take, with the ids not among those read (all of them where nothing was read)
+    const type = KNOWN_TYPES[inst];
+    if (this.o.known !== false && type !== undefined) {
+        this.logIds(null).forEach((L) => {
+            const id = itemId(L.n === null ? 0 : L.n, type, 0), hex = id.slice(0, 2).toString('hex').toUpperCase() + 'xxxx';
+            if (seen[hex]) return;
+            seen[hex] = true;
+            out.push({ key: 'sdk:' + L.key, family: 'sdk', id: hex, name: 'BMW\'s item, id ' + hex, builtin: true, make: (value, size) => {
+                const to = Buffer.from(id);
+                this.idCount = ((this.idCount || 0) + 1) & 0xffff;
+                to.writeUInt16BE(this.idCount, 2);
+                // (the item whole as the car took it: its size where known, its id twice, its place, its position)
+                return [{ id: to, metadata: (size ? [{ key: 'FILE_SIZE', value: { numeric: size } }] : []).concat([{ key: 'ITEM_ID', value: { id: Buffer.from(to) } }, { key: 'FILE_NAME', value: { stringValue: value } }]), pos: 1 }];
+            } });
+        });
+        // (the one that played goes first where nothing was read)
+        const at = out.findIndex((x) => x.builtin && x.key === KNOWN.form);
+        if (at > 0 && out.every((x) => x.builtin)) out.unshift(out.splice(at, 1)[0]);
+    }
+    return out;
+};
+/* The way a car is known to play, for a car that has kept none: null where it is not to be used (switched off, that
+ * instance is not there, or it was not heard on this car). */
+Sound.prototype.known = function (insts) {
+    if (this.o.known === false || this.state.kept || this.state.silent[KNOWN.key]) return null;
+    return (insts || this.dynInsts()).indexOf(KNOWN.key.slice(4)) >= 0 ? KNOWN : null;
+};
+/* (the forms BMW's code gave when it was read) */
+Sound.prototype.readForms = function (inst, r, out, seen) {
     if (!r || !r.ok) return out;
     const norm = (x) => String(x || '').replace(/^DynamicMediaPlayer/, '').replace(/^Entertainment/, '').replace(/Media$/, '').toLowerCase();
     const add = (key, tpl) => {
@@ -1316,10 +1389,11 @@ Sound.prototype.play = async function (file, info) {
     this.runs.unshift(run);
     if (this.runs.length > 3) this.runs.length = 3;
     const st = this.state, errors = [];
+    let lead = null;       // the way a car is known to play, until it was asked on this one
     const tryRoute = async (r) => {
         this.route = r;
         try {
-            await r.play(file, info, st.kept);
+            await r.play(file, info, st.kept || lead);
             if (this.cancelled) throw r.fail('was stopped');
             r.activate();
             st.kept = Object.assign({ key: r.key, at: Date.now(), plays: st.kept && st.kept.key === r.key ? (st.kept.plays || 0) + 1 : 1 },
@@ -1334,6 +1408,7 @@ Sound.prototype.play = async function (file, info) {
             this.route = null;
             try { await r.release(); } catch (e2) { this.o.log('sound: release failed: ' + errText(e2)); }
             if (st.kept && st.kept.key === r.key) { st.kept = null; this.save(); }
+            if (lead && lead.key === r.key) lead = null;
             return false;
         }
     };
@@ -1341,8 +1416,9 @@ Sound.prototype.play = async function (file, info) {
     const playing = (d) => this.route === d || (this.route instanceof FocusRoute && this.route.dyn === d);
     try {
         const insts = this.dynInsts();
-        // the way kept from the last play that worked
-        const k = st.kept;
+        // the way kept from the last play that worked; none kept: the way a car is known to play
+        lead = this.known(insts);
+        const k = st.kept || lead;
         let m;
         if (k && !st.silent[k.key]) {
             if ((m = /^direct:(.+)$/.exec(k.key))) {
@@ -1490,6 +1566,7 @@ Sound.prototype.lines = function () {
     const st = this.state, out = [];
     const k = st.kept;
     out.push(k ? 'Kept from the last play that worked: ' + k.key + (k.form ? ' | item ' + k.form + ' | file ' + k.loc + ' | start ' + k.start : '') + (k.hb !== undefined ? ' | focus ' + k.clientId + ', timer ' + k.hb : '') + (k.unit ? ' | time in ' + k.unit : '') + ' | ' + (k.plays || 1) + ' plays'
+        : this.known() ? 'Nothing is kept from a play on this car yet: a play first asks the way a car is known to play (' + KNOWN.key + ' | item ' + KNOWN.form + ' | file ' + KNOWN.loc + ' | start ' + KNOWN.start + '), then tries the others.'
         : 'No way to play sound is known for this car yet: a play tries them all.');
     const silent = Object.keys(st.silent);
     if (silent.length) out.push('Played without sound (left out; Settings > "Sound: start over" tries them again): ' + silent.join(', '));
@@ -1523,6 +1600,10 @@ Sound.prototype.playLines = function () {
     const out = [], r = this.sdk;
     if (!r) return ['BMW\'s own player code has not been looked for yet (a play does that).'];
     out.push('BMW\'s own player code: ' + (r.ok ? 'read from ' + r.file + ' (class ' + r.cls + ')' : 'NOT read: ' + r.error + (r.file ? ' (' + r.file + ')' : '')));
+    if (!r.ok && this.o.known !== false) {
+        out.push('Asked without it, as a car is known to take it (a G87 M2): the item with FILE_SIZE, ITEM_ID, FILE_NAME and an id of four bytes - ' +
+            Object.keys(KNOWN_TYPES).map((i) => i.replace(/^DynamicMediaPlayer/, '') + ' ' + this.idForms(i).filter((f) => f.builtin).map((f) => f.id).join(' / ')).join(' | '));
+    }
     const st = r.statics ? Object.keys(r.statics) : [];
     if (st.length) out.push('What the class carries: ' + st.map((k) => k + ' = ' + sdkread.show(r.statics[k]).slice(0, 300)).join(' | '));
     if (r.fields && Object.keys(r.fields).length) out.push('Made as an app makes it' + (r.states && r.states[0] ? ' (' + r.states[0][0] + ')' : '') + ': ' + Object.keys(r.fields).map((k) => k + ' = ' + sdkread.show(r.fields[k]).slice(0, 80)).join(' | '));
